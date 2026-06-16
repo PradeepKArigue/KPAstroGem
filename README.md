@@ -3,7 +3,7 @@
 KPAstroGem is a local-first MVP for a KP astrology web application. This repository contains:
 
 - `frontend/`: Next.js + React + TypeScript + Tailwind UI
-- `backend/`: FastAPI API with structured placeholder KP analysis
+- `backend/`: FastAPI API with temporary chart sessions and structured placeholder KP responses
 
 This version is intentionally a placeholder MVP. It does not claim final astrological accuracy and includes clear `TODO` markers where real KP calculations will later be implemented.
 
@@ -18,9 +18,9 @@ KPAstroGem/
 
 ## Current Status
 
-- Frontend and backend source files are scaffolded
-- API contract is wired end to end
-- Placeholder KP response is implemented
+- Multi-page frontend flow is scaffolded
+- Temporary chart-session API contract is wired end to end
+- Placeholder KP chart and question-answer responses are implemented
 - Local install commands have not been run yet
 
 ## Prerequisites
@@ -112,7 +112,8 @@ The included `.env.local.example` already uses the default local backend URL.
 1. Start the backend from `backend/`
 2. Start the frontend from `frontend/`
 3. Open [http://localhost:3000](http://localhost:3000)
-4. Submit the form and review the placeholder KP analysis
+4. Create a chart session from `/birth-details`
+5. Review the dashboard and ask a question from the session-specific route
 
 ## Sample Test Profile
 
@@ -132,7 +133,7 @@ Use this profile for the first manual test:
 
 Returns a small status payload for startup checks.
 
-### `POST /api/kp/analyze`
+### `POST /api/charts/calculate`
 
 Accepts:
 
@@ -142,21 +143,64 @@ Accepts:
   "dateOfBirth": "1988-12-09",
   "timeOfBirth": "18:30",
   "birthPlace": "Secunderabad",
+  "state": "Telangana",
   "country": "India",
+  "timezone": "Asia/Kolkata",
   "questionCategory": "Career",
   "question": "How is my career growth?"
 }
 ```
 
-Returns structured placeholder KP output including:
+Returns:
+
+- `chartId`
+- `chart`
+
+The `chart` contains:
 
 - Birth summary
 - Planetary positions
 - House cusps
 - Star lord
 - Sub lord
+- Dasha summary
 - KP-style interpretation
 - Confidence level
+- Disclaimer
+
+### `GET /api/charts/{chart_id}`
+
+Returns the temporary chart session, including:
+
+- `chartId`
+- `createdAt`
+- `expiresAt`
+- `chartData`
+- `questionHistory`
+
+### `POST /api/questions/ask`
+
+Accepts:
+
+```json
+{
+  "chartId": "your-chart-id",
+  "question": "How is my career growth?",
+  "optionalDateRange": "Second half of 2026"
+}
+```
+
+Returns structured placeholder question analysis including:
+
+- Classified topic
+- Relevant houses
+- Cusp sub lord analysis
+- Significator analysis
+- Dasha support
+- Supporting and blocking factors
+- KP-based interpretation
+- Possible timing window
+- Calculation trail
 - Disclaimer
 
 ## Suggested Local Checks
@@ -181,4 +225,3 @@ npm run build
 - No scraping or AstroSage integration is used
 - Install commands should only be run in this Codex session after your approval
 - Real KP calculations are still pending and marked with `TODO` comments in the backend
-
