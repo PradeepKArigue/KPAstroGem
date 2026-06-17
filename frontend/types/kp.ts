@@ -17,6 +17,46 @@ export type ChartCalculationRequest = BirthInput & {
   question: string;
 };
 
+export type LocationSearchResult = {
+  displayName: string;
+  city: string;
+  stateOrProvince?: string | null;
+  country?: string | null;
+  latitude: number;
+  longitude: number;
+  timezone?: string | null;
+  confidence: number;
+};
+
+export type TimezoneResolutionResponse = {
+  timezone?: string | null;
+  confidence: number;
+  note: string;
+};
+
+export type LocationValidationRequest = {
+  birthPlace: string;
+  state?: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  dateOfBirth: string;
+  timeOfBirth: string;
+};
+
+export type LocationValidationResponse = {
+  birthPlace: string;
+  state?: string | null;
+  country: string;
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  normalizedUtcTime: string;
+  confidence: number;
+  warnings: string[];
+};
+
 export type BirthSummary = {
   name: string;
   dateOfBirth: string;

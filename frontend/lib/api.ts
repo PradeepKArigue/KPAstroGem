@@ -4,7 +4,11 @@ import type {
   ChartQuestionRequest,
   ChartQuestionResponse,
   ChartSessionResponse,
+  LocationSearchResult,
+  LocationValidationRequest,
+  LocationValidationResponse,
   QuestionTopicCatalog,
+  TimezoneResolutionResponse,
 } from "@/types/kp";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -44,8 +48,44 @@ export function createChartSession(payload: ChartCalculationRequest) {
   });
 }
 
+export function searchLocations(query: string, state?: string, country?: string) {
+  const params = new URLSearchParams({ q: query });
+  if (state?.trim()) {
+    params.set("state", state.trim());
+  }
+  if (country?.trim()) {
+    params.set("country", country.trim());
+  }
+
+  return apiRequest<LocationSearchResult[]>(`/api/locations/search?${params.toString()}`);
+}
+
+export function resolveTimezone(latitude: number, longitude: number, birthDate?: string) {
+  return apiRequest<TimezoneResolutionResponse>("/api/locations/resolve-timezone", {
+    method: "POST",
+    body: JSON.stringify({
+      latitude,
+      longitude,
+      birthDate,
+    }),
+  });
+}
+
+export function validateLocation(payload: LocationValidationRequest) {
+  return apiRequest<LocationValidationResponse>("/api/locations/validate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getChartSession(chartId: string) {
   return apiRequest<ChartSessionResponse>(`/api/charts/${chartId}`);
+}
+
+export function deleteChartSession(chartId: string) {
+  return apiRequest<{ status: string }>(`/api/charts/${chartId}`, {
+    method: "DELETE",
+  });
 }
 
 export function askQuestion(payload: ChartQuestionRequest) {

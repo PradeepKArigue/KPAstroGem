@@ -62,6 +62,14 @@ class ChartSessionStore:
 
         session.question_history.append(answer)
 
+    def delete(self, chart_id: str) -> bool:
+        self._purge_expired()
+        if chart_id not in self._sessions:
+            return False
+
+        del self._sessions[chart_id]
+        return True
+
 
 chart_session_store = ChartSessionStore()
 

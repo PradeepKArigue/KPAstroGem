@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
-import { getChartSession } from "@/lib/api";
+import { deleteChartSession, getChartSession } from "@/lib/api";
 import type { ChartSessionResponse } from "@/types/kp";
 
 export function ChartDashboard({ chartId }: { chartId: string }) {
+  const router = useRouter();
   const [session, setSession] = useState<ChartSessionResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +54,22 @@ export function ChartDashboard({ chartId }: { chartId: string }) {
 
   const { chartData, questionHistory, expiresAt } = session;
 
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setErrorMessage(null);
+
+    try {
+      await deleteChartSession(chartId);
+      router.push("/birth-details");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "The temporary chart session could not be deleted.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <section className="glass-panel p-6 sm:p-8">
@@ -78,6 +97,14 @@ export function ChartDashboard({ chartId }: { chartId: string }) {
           <Link href="/birth-details" className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-midnight transition hover:border-aurora hover:text-aurora">
             Create Another Session
           </Link>
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={() => void handleDelete()}
+            className="rounded-full border border-roseclay/30 bg-white px-5 py-3 text-sm font-semibold text-roseclay transition hover:border-roseclay hover:bg-roseclay/5 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isDeleting ? "Deleting Session..." : "Delete Temporary Chart Data"}
+          </button>
         </div>
       </section>
 
