@@ -30,8 +30,8 @@ const initialForm: ChartCalculationRequest = {
   state: "Telangana",
   country: "India",
   timezone: "Asia/Kolkata",
-  latitude: 17.4399,
-  longitude: 78.4983,
+  latitude: undefined,
+  longitude: undefined,
   manualTimezoneOverride: "",
   manualCoordinateOverride: false,
   questionCategory: "Career",
@@ -46,7 +46,7 @@ export function BirthForm() {
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSearchResult[]>([]);
   const [isResolvingPlace, setIsResolvingPlace] = useState(false);
   const [placeLookupMessage, setPlaceLookupMessage] = useState<string | null>(null);
-  const [hasSelectedSuggestion, setHasSelectedSuggestion] = useState(true);
+  const [hasSelectedSuggestion, setHasSelectedSuggestion] = useState(false);
 
   const updateField = <T extends keyof ChartCalculationRequest>(field: T, value: ChartCalculationRequest[T]) => {
     setFormData((current) => ({ ...current, [field]: value }));

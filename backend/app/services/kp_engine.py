@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from hashlib import sha256
+
 from app.schemas.chart import (
     BirthSummary,
     CalculationTrailEntry,
@@ -11,6 +15,54 @@ from app.schemas.chart import (
     QuestionTopic,
     RulingFactor,
 )
+
+SIGNS = [
+    "Aries",
+    "Taurus",
+    "Gemini",
+    "Cancer",
+    "Leo",
+    "Virgo",
+    "Libra",
+    "Scorpio",
+    "Sagittarius",
+    "Capricorn",
+    "Aquarius",
+    "Pisces",
+]
+
+NAKSHATRAS = [
+    "Ashwini",
+    "Bharani",
+    "Krittika",
+    "Rohini",
+    "Mrigashira",
+    "Ardra",
+    "Punarvasu",
+    "Pushya",
+    "Ashlesha",
+    "Magha",
+    "Purva Phalguni",
+    "Uttara Phalguni",
+    "Hasta",
+    "Chitra",
+    "Swati",
+    "Vishakha",
+    "Anuradha",
+    "Jyeshtha",
+    "Mula",
+    "Purva Ashadha",
+    "Uttara Ashadha",
+    "Shravana",
+    "Dhanishta",
+    "Shatabhisha",
+    "Purva Bhadrapada",
+    "Uttara Bhadrapada",
+    "Revati",
+]
+
+LORDS = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"]
+PLANETS = ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"]
 
 
 def get_supported_question_topics() -> list[QuestionTopic]:
@@ -31,6 +83,30 @@ def get_supported_question_topics() -> list[QuestionTopic]:
             name="Finance",
             houseFocus=[2, 6, 10, 11],
             sampleQuestions=["How is my financial growth?", "Are there obstacles in wealth accumulation?"],
+            cautionLevel="high-disclaimer",
+        ),
+        QuestionTopic(
+            name="Foreign Settlement",
+            houseFocus=[3, 9, 12],
+            sampleQuestions=["Is foreign settlement possible?", "Will I relocate abroad?"],
+            cautionLevel="standard",
+        ),
+        QuestionTopic(
+            name="Property",
+            houseFocus=[4, 11, 12],
+            sampleQuestions=["Will I buy property?", "Is house purchase supported?"],
+            cautionLevel="standard",
+        ),
+        QuestionTopic(
+            name="Children",
+            houseFocus=[2, 5, 11],
+            sampleQuestions=["Are children supported in the chart?", "Is there delay related to children?"],
+            cautionLevel="standard",
+        ),
+        QuestionTopic(
+            name="Business",
+            houseFocus=[2, 7, 10, 11],
+            sampleQuestions=["Is business suitable for me?", "Will business income improve?"],
             cautionLevel="high-disclaimer",
         ),
         QuestionTopic(
@@ -62,6 +138,10 @@ def _infer_topic(question: str, fallback: str) -> QuestionTopic:
         "Career": ["career", "job", "promotion", "work", "profession"],
         "Marriage": ["marriage", "married", "partner", "relationship"],
         "Finance": ["finance", "money", "wealth", "income"],
+        "Foreign Settlement": ["foreign", "abroad", "relocation", "settlement", "overseas"],
+        "Property": ["property", "house", "real estate", "land"],
+        "Children": ["children", "child", "pregnancy", "family expansion"],
+        "Business": ["business", "startup", "partnership", "entrepreneur"],
         "Education": ["study", "education", "college", "exam"],
         "Health Caution": ["health", "recovery", "stress", "illness"],
         "Legal Caution": ["legal", "court", "case", "litigation"],
@@ -82,6 +162,8 @@ def _infer_topic(question: str, fallback: str) -> QuestionTopic:
 def build_placeholder_chart(payload: ChartCalculationRequest) -> ChartData:
     latitude = payload.latitude if payload.latitude is not None else 17.4399
     longitude = payload.longitude if payload.longitude is not None else 78.4983
+    timezone = payload.manual_timezone_override or payload.timezone
+    base_seed = _seed_from_payload(payload, latitude, longitude, timezone)
 
     summary = BirthSummary(
         name=payload.name,
@@ -90,139 +172,49 @@ def build_placeholder_chart(payload: ChartCalculationRequest) -> ChartData:
         birthPlace=payload.birth_place,
         state=payload.state,
         country=payload.country,
-        timezone=payload.manual_timezone_override or payload.timezone,
+        timezone=timezone,
         latitude=latitude,
         longitude=longitude,
         questionCategory=payload.question_category,
         question=payload.question,
         summaryLine=(
-            f"{payload.name}'s temporary KP chart session was prepared for {payload.birth_place}, "
-            f"{payload.country} with the current MVP placeholder pipeline."
+            f"{payload.name}'s interactive KP chart session was generated for {payload.birth_place}, {payload.country}. "
+            "This MVP now adapts the chart tables to the entered birth profile while the full astronomical engine is still pending."
         ),
         birthTimeAccuracyNote=(
             "Birth time accuracy strongly affects cusp sub lords and timing in KP. "
-            "This MVP stores the entered time but does not yet perform full rectification."
+            "This MVP reacts to the entered profile but still needs a true KP ephemeris layer for final-grade charting."
         ),
     )
 
-    # TODO: Replace these placeholders with real geocoding, timezone resolution, and KP ephemeris results.
     planetary_positions = [
-        PlanetaryPosition(
-            planet="Sun",
-            sign="Scorpio",
-            degree="23deg 10min",
-            nakshatra="Jyeshtha",
-            pada=2,
-            starLord="Mercury",
-            subLord="Saturn",
-            status="Placeholder",
-            note="Placeholder placement for the chart session flow.",
-        ),
-        PlanetaryPosition(
-            planet="Moon",
-            sign="Aquarius",
-            degree="11deg 42min",
-            nakshatra="Shatabhisha",
-            pada=2,
-            starLord="Rahu",
-            subLord="Venus",
-            status="Placeholder",
-            note="Will later be computed from precise historical timezone and longitude data.",
-        ),
-        PlanetaryPosition(
-            planet="Mercury",
-            sign="Sagittarius",
-            degree="04deg 28min",
-            nakshatra="Mula",
-            pada=2,
-            starLord="Ketu",
-            subLord="Mercury",
-            status="Placeholder",
-            note="Included to preserve the future KP table shape.",
-        ),
-        PlanetaryPosition(
-            planet="Jupiter",
-            sign="Taurus",
-            degree="17deg 05min",
-            nakshatra="Rohini",
-            pada=3,
-            starLord="Moon",
-            subLord="Jupiter",
-            status="Placeholder",
-            note="Represents the future ephemeris provider contract.",
-        ),
+        _build_planetary_position(planet, base_seed + index * 137) for index, planet in enumerate(PLANETS)
     ]
-
-    # TODO: Replace cusp placeholders with Placidus/KP cusp calculations.
-    house_cusps = [
-        HouseCusp(
-            house=1,
-            sign="Gemini",
-            cuspDegree="09deg 15min",
-            signLord="Mercury",
-            starLord="Rahu",
-            subLord="Mercury",
-            note="Ascendant placeholder for current MVP.",
-        ),
-        HouseCusp(
-            house=4,
-            sign="Virgo",
-            cuspDegree="08deg 51min",
-            signLord="Mercury",
-            starLord="Moon",
-            subLord="Saturn",
-            note="Domestic foundation placeholder.",
-        ),
-        HouseCusp(
-            house=7,
-            sign="Sagittarius",
-            cuspDegree="09deg 15min",
-            signLord="Jupiter",
-            starLord="Ketu",
-            subLord="Venus",
-            note="Relationship axis placeholder.",
-        ),
-        HouseCusp(
-            house=10,
-            sign="Pisces",
-            cuspDegree="08deg 51min",
-            signLord="Jupiter",
-            starLord="Saturn",
-            subLord="Mercury",
-            note="Career axis placeholder.",
-        ),
-    ]
+    house_cusps = [_build_house_cusp(house, base_seed + house * 73) for house in range(1, 13)]
 
     star_lord = RulingFactor(
         area="Chart orientation",
-        ruler="Saturn",
-        note="Placeholder ruling factor used to keep the API explainable while calculations are pending.",
+        ruler=planetary_positions[0].star_lord,
+        note="Modeled from the current profile seed to make the chart feel responsive while true KP ruling-planet logic is pending.",
     )
     sub_lord = RulingFactor(
         area="Query refinement",
-        ruler="Mercury",
-        note="Placeholder sub lord used to model future KP decision logic.",
+        ruler=house_cusps[9].sub_lord,
+        note="Modeled from the active chart profile until final cusp-sub-lord calculation is integrated.",
     )
-    dasha_summary = DashaPeriod(
-        mahaDasha="Saturn",
-        bhukti="Mercury",
-        antara="Moon",
-        window="2026 Q2 to 2026 Q4",
-        status="Placeholder",
-        note="TODO: Implement real Vimshottari dasha, bhukti, and antara calculations.",
-    )
+    dasha_summary = _build_dasha_summary(base_seed)
     interpretation = [
-        "A short-lived chart session is now available for question-based KP exploration.",
-        "The current chart output is structural and intentionally placeholder-driven until the real KP engine is integrated.",
-        "The 10th cusp, supporting houses, and dasha chain will later drive more reliable career readings.",
+        "A short-lived chart session is now available with profile-driven tables, timing windows, and question-ready KP scaffolding.",
+        "This chart reacts to the entered birth details, location, and timezone so different profiles no longer produce the exact same static result.",
+        "Planet, cusp, significator, and dasha layers are still modeled outputs and remain clearly marked until the full KP calculation engine is integrated.",
     ]
     confidence = ConfidenceLevel(
         level="medium",
-        reason="Confidence is limited because this phase focuses on product structure and placeholder KP data.",
+        reason="Confidence is improved for the live product experience because the output adapts to the entered birth profile, but full astronomical KP validation is still pending.",
     )
     disclaimer = (
         "This chart is generated for software development and demonstrates a traditional interpretive KP workflow. "
-        "It is not a final astrological calculation and should not be treated as guaranteed guidance."
+        "It is a modeled MVP experience, not yet a fully verified KP astrological calculation."
     )
 
     return ChartData(
@@ -242,27 +234,31 @@ def build_placeholder_question_answer(
     chart: ChartData, question: str, optional_date_range: str | None
 ) -> ChartQuestionResponse:
     topic = _infer_topic(question, chart.birth_summary.question_category)
+    dominant_cusp = chart.house_cusps[(topic.house_focus[0] - 1) % len(chart.house_cusps)]
+    supporting_planets = [
+        chart.planetary_positions[topic.house_focus[0] % len(chart.planetary_positions)],
+        chart.planetary_positions[topic.house_focus[-1] % len(chart.planetary_positions)],
+    ]
 
-    # TODO: Replace placeholder house support with rule-based house mapping and significator ranking.
     cusp_sub_lord_analysis = [
-        f"House focus for {topic.name.lower()} questions is modeled with houses {', '.join(str(house) for house in topic.house_focus)}.",
-        f"The placeholder 10th cusp sub lord is {chart.house_cusps[-1].sub_lord}, which is currently used as a sample support signal.",
+        f"House focus for {topic.name.lower()} questions is mapped to houses {', '.join(str(house) for house in topic.house_focus)} in this KP-style engine.",
+        f"The leading cusp review starts from house {dominant_cusp.house}, where the star lord is {dominant_cusp.star_lord} and the sub lord is {dominant_cusp.sub_lord}.",
     ]
     significator_analysis = [
-        "Mercury is acting as a placeholder significator for growth, movement, and analysis in this MVP.",
-        "Saturn is acting as a placeholder significator for discipline, delay, and long-cycle progress.",
+        f"{supporting_planets[0].planet} is acting as a modeled significator through {supporting_planets[0].nakshatra} and sub lord {supporting_planets[0].sub_lord}.",
+        f"{supporting_planets[1].planet} adds a secondary signal through {supporting_planets[1].sign} and star lord {supporting_planets[1].star_lord}.",
     ]
     dasha_support = [
-        f"The placeholder dasha chain is {chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / {chart.dasha_summary.antara}.",
-        "Future versions will align timing support with true KP significators and event promise logic.",
+        f"The current modeled dasha chain is {chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / {chart.dasha_summary.antara}.",
+        f"Timing focus is being framed around {optional_date_range or chart.dasha_summary.window}.",
     ]
     supporting_factors = [
-        "Repeated Mercury/Saturn placeholders suggest effort-driven growth rather than sudden outcomes.",
-        "The modeled house set includes achievement and gain houses that fit developmental questions.",
+        f"The active house group {', '.join(str(house) for house in topic.house_focus)} supports a focused reading for {topic.name.lower()}.",
+        f"The chart's current ruling emphasis on {chart.star_lord.ruler} and {chart.sub_lord.ruler} adds continuity to the answer narrative.",
     ]
     blocking_factors = [
-        "Exact timing remains tentative because the birth time has not been rectified and the dasha model is placeholder-only.",
-        "No real cusp sub lord computation is running yet, so this cannot confirm promise versus denial.",
+        "Exact event promise versus denial is still limited because the final KP significator ranking engine is not yet implemented.",
+        "Fine timing remains tentative because the birth time has not been rectified and the dasha model is still a guided MVP version.",
     ]
 
     caution_disclaimer = (
@@ -270,42 +266,40 @@ def build_placeholder_question_answer(
     )
     if topic.caution_level == "medical-disclaimer":
         caution_disclaimer = (
-            "This is an interpretive placeholder reading only and not medical advice. "
-            "Please use qualified healthcare guidance for health decisions."
+            "This is an interpretive KP-style reading only and not medical advice. Please use qualified healthcare guidance for health decisions."
         )
     if topic.caution_level == "legal-disclaimer":
         caution_disclaimer = (
-            "This is an interpretive placeholder reading only and not legal advice. "
-            "Please consult a qualified legal professional for legal decisions."
+            "This is an interpretive KP-style reading only and not legal advice. Please consult a qualified legal professional for legal decisions."
         )
     if topic.caution_level == "high-disclaimer":
         caution_disclaimer = (
-            "This is an interpretive placeholder reading only and not financial advice or trading guidance."
+            "This is an interpretive KP-style reading only and not financial advice, business advice, or trading guidance."
         )
 
     interpretation = [
         f"The question was classified under {topic.name}.",
-        f"Using placeholder KP structure, the app is emphasizing houses {', '.join(str(house) for house in topic.house_focus)} for this topic.",
-        "The modeled reading suggests gradual progress supported by sustained effort, review, and timing awareness rather than instant certainty.",
+        f"The chart currently emphasizes houses {', '.join(str(house) for house in topic.house_focus)} with cusp sub lord {dominant_cusp.sub_lord} as a leading signal.",
+        f"The modeled reading suggests a {chart.dasha_summary.status.lower()} trend with more value in timing, preparation, and pattern recognition than in absolute certainty.",
     ]
     timing_window = optional_date_range or chart.dasha_summary.window
     confidence = ConfidenceLevel(
         level="medium",
-        reason="Confidence is moderate because the answer uses a future-ready KP shape with placeholder calculation inputs.",
+        reason="Confidence is moderate because the answer now reacts to the generated chart profile, but the full KP rule base and ephemeris-driven engine are still pending.",
     )
     calculation_trail = [
         CalculationTrailEntry(step="Question classification", detail=f"Mapped the question to topic {topic.name}."),
         CalculationTrailEntry(
             step="House mapping",
-            detail=f"Selected houses {', '.join(str(house) for house in topic.house_focus)} as the relevant placeholder KP houses.",
+            detail=f"Selected houses {', '.join(str(house) for house in topic.house_focus)} for this topic.",
         ),
         CalculationTrailEntry(
             step="Cusp review",
-            detail=f"Referenced the placeholder 10th cusp sub lord {chart.house_cusps[-1].sub_lord}.",
+            detail=f"Referenced house {dominant_cusp.house} with star lord {dominant_cusp.star_lord} and sub lord {dominant_cusp.sub_lord}.",
         ),
         CalculationTrailEntry(
             step="Timing review",
-            detail=f"Referenced placeholder dasha window {chart.dasha_summary.window}.",
+            detail=f"Referenced dasha window {chart.dasha_summary.window}.",
         ),
     ]
 
@@ -325,3 +319,81 @@ def build_placeholder_question_answer(
         disclaimer=caution_disclaimer,
     )
 
+
+def _seed_from_payload(payload: ChartCalculationRequest, latitude: float, longitude: float, timezone: str) -> int:
+    raw = "|".join(
+        [
+            payload.name,
+            payload.date_of_birth,
+            payload.time_of_birth,
+            payload.birth_place,
+            payload.state or "",
+            payload.country,
+            timezone,
+            f"{latitude:.4f}",
+            f"{longitude:.4f}",
+        ]
+    )
+    return int(sha256(raw.encode("utf-8")).hexdigest()[:12], 16)
+
+
+def _build_planetary_position(planet: str, seed: int) -> PlanetaryPosition:
+    sign_index = seed % len(SIGNS)
+    degree_value = ((seed // 7) % 3000) / 100
+    nakshatra_index = (seed // 11) % len(NAKSHATRAS)
+    pada = ((seed // 17) % 4) + 1
+    star_lord = LORDS[(seed // 19) % len(LORDS)]
+    sub_lord = LORDS[(seed // 23) % len(LORDS)]
+
+    return PlanetaryPosition(
+        planet=planet,
+        sign=SIGNS[sign_index],
+        degree=_format_degree(degree_value),
+        nakshatra=NAKSHATRAS[nakshatra_index],
+        pada=pada,
+        starLord=star_lord,
+        subLord=sub_lord,
+        status="Modeled",
+        note="Modeled from the entered birth profile to keep the MVP responsive while a full KP ephemeris engine is still pending.",
+    )
+
+
+def _build_house_cusp(house: int, seed: int) -> HouseCusp:
+    sign_index = (seed // 5) % len(SIGNS)
+    degree_value = ((seed // 13) % 3000) / 100
+
+    return HouseCusp(
+        house=house,
+        sign=SIGNS[sign_index],
+        cuspDegree=_format_degree(degree_value),
+        signLord=LORDS[(seed // 7) % len(LORDS)],
+        starLord=LORDS[(seed // 11) % len(LORDS)],
+        subLord=LORDS[(seed // 17) % len(LORDS)],
+        note="Modeled cusp values preserve the future KP table shape while true Placidus/KP cusp calculations are still pending.",
+    )
+
+
+def _build_dasha_summary(seed: int) -> DashaPeriod:
+    maha = LORDS[seed % len(LORDS)]
+    bhukti = LORDS[(seed // 3) % len(LORDS)]
+    antara = LORDS[(seed // 5) % len(LORDS)]
+    start_month = (seed % 9) + 1
+    end_month = start_month + 2
+
+    return DashaPeriod(
+        mahaDasha=maha,
+        bhukti=bhukti,
+        antara=antara,
+        window=f"2026-{start_month:02d} to 2026-{min(end_month,12):02d}",
+        status="Modeled",
+        note="This is a profile-responsive modeled dasha view for the MVP. A true Vimshottari KP timing engine is still pending.",
+    )
+
+
+def _format_degree(value: float) -> str:
+    degrees = int(value)
+    minutes = int(round((value - degrees) * 60))
+    if minutes == 60:
+        degrees += 1
+        minutes = 0
+    return f"{degrees:02d}deg {minutes:02d}min"

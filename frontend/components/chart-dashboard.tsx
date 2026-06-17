@@ -94,6 +94,9 @@ export function ChartDashboard({ chartId }: { chartId: string }) {
           <Link href={`/ask/${chartId}`} className="rounded-full bg-midnight px-5 py-3 text-sm font-semibold text-white transition hover:bg-aurora">
             Ask a KP Question
           </Link>
+          <Link href={`/report/${chartId}`} className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-midnight transition hover:text-aurora">
+            Open Full Jathakam Report
+          </Link>
           <Link href="/birth-details" className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-midnight transition hover:border-aurora hover:text-aurora">
             Create Another Session
           </Link>

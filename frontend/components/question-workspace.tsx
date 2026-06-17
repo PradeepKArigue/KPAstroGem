@@ -66,6 +66,16 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
         optionalDateRange: dateRange.trim() || undefined,
       });
       setAnswer(payload);
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              questionHistory: [...current.questionHistory, payload],
+            }
+          : current,
+      );
+      setQuestion("");
+      setDateRange("");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "The backend could not answer the question.");
     } finally {
@@ -117,6 +127,24 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
             <p className="mt-2 text-sm text-midnight/70">{session.chartData.birthSummary.questionCategory}</p>
           </div>
 
+          <div className="mt-5">
+            <p className="mb-3 text-sm font-semibold text-midnight">Suggested questions</p>
+            <div className="flex flex-wrap gap-2">
+              {topics.flatMap((topic) =>
+                topic.sampleQuestions.slice(0, 1).map((sample) => (
+                  <button
+                    key={sample}
+                    type="button"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-midnight transition hover:border-aurora hover:text-aurora"
+                    onClick={() => setQuestion(sample)}
+                  >
+                    {sample}
+                  </button>
+                )),
+              )}
+            </div>
+          </div>
+
           <label className="mt-5 block">
             <span className="mb-2 block text-sm font-semibold text-midnight">Question</span>
             <textarea
@@ -162,6 +190,22 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
               </div>
             ))}
           </div>
+
+          {session.questionHistory.length > 0 ? (
+            <div className="mt-6">
+              <p className="section-title">Conversation History</p>
+              <div className="mt-4 space-y-3">
+                {session.questionHistory.map((item, index) => (
+                  <div key={`${item.question}-${index}`} className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-aurora/80">You asked</p>
+                    <p className="mt-2 font-semibold text-midnight">{item.question}</p>
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-midnight/60">KP response</p>
+                    <p className="mt-2 text-sm leading-6 text-midnight/70">{item.interpretation[0]}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </aside>
       </section>
 

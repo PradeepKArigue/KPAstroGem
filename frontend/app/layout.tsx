@@ -29,7 +29,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${bodyFont.variable} ${headingFont.variable} font-[family-name:var(--font-body)]`}>
+      <body
+        suppressHydrationWarning
+        className={`${bodyFont.variable} ${headingFont.variable} font-[family-name:var(--font-body)]`}
+      >
         <div className="px-4 pt-4 sm:px-6 lg:px-10">
           <SiteHeader />
         </div>
