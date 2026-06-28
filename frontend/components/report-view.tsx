@@ -148,6 +148,35 @@ export function ReportView({ chartId }: { chartId: string }) {
         </TableCard>
       </section>
 
+      <TableCard title="How To Read This KP Report">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <ReadingStep
+            title="Birth normalization first"
+            detail="The app confirms birthplace, coordinates, timezone, and normalized UTC time before any chart session is created."
+          />
+          <ReadingStep
+            title="Cusps drive the reading"
+            detail="KP relies heavily on house cusps and their star-lord and sub-lord relationships, so the cusp table should be read before jumping to conclusions."
+          />
+          <ReadingStep
+            title="Planets are read through multiple links"
+            detail="A planet is not judged only by sign. It is also read through occupied house, sign-lord house, star-lord house, and sub-lord house."
+          />
+          <ReadingStep
+            title="Activation matrix explains emphasis"
+            detail="The house-activation grid is a compact way to see which houses a planet is modeled to support more strongly."
+          />
+          <ReadingStep
+            title="Dasha windows explain timing"
+            detail="The dasha ladder is the timing layer. In a full KP engine, this should help separate event promise from event timing."
+          />
+          <ReadingStep
+            title="Q&A should cite the trail"
+            detail="Every topic answer should connect the life question to houses, cusp logic, significators, and dasha support rather than giving a generic paragraph."
+          />
+        </div>
+      </TableCard>
+
       <TableCard title="Planetary Position Table">
         <DenseTable
           headers={["Planet", "Sign", "Degree", "Nakshatra", "Pada", "Star Lord", "Sub Lord", "Status"]}
@@ -515,6 +544,15 @@ function QuestionHistoryCard({ item }: { item: ChartQuestionResponse }) {
           <span className="font-semibold text-midnight">Timing window:</span> {item.possibleTimingWindow}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ReadingStep({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 px-4 py-4">
+      <p className="text-sm font-semibold text-midnight">{title}</p>
+      <p className="mt-2 text-sm leading-7 text-midnight/70">{detail}</p>
     </div>
   );
 }
