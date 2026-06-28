@@ -23,13 +23,13 @@ const questionCategories = [
 ];
 
 const initialForm: ChartCalculationRequest = {
-  name: "Pradeep",
-  dateOfBirth: "1988-12-09",
-  timeOfBirth: "18:30",
-  birthPlace: "Secunderabad",
-  state: "Telangana",
-  country: "India",
-  timezone: "Asia/Kolkata",
+  name: "",
+  dateOfBirth: "",
+  timeOfBirth: "",
+  birthPlace: "",
+  state: "",
+  country: "",
+  timezone: "",
   latitude: undefined,
   longitude: undefined,
   manualTimezoneOverride: "",
@@ -210,7 +210,12 @@ export function BirthForm() {
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2">
         <Field label="Name">
-          <input className={inputClass} value={formData.name} onChange={(event) => updateField("name", event.target.value)} />
+          <input
+            className={inputClass}
+            value={formData.name}
+            onChange={(event) => updateField("name", event.target.value)}
+            placeholder="Enter the chart owner's name"
+          />
         </Field>
         <Field label="Question category">
           <select
@@ -266,13 +271,28 @@ export function BirthForm() {
           </div>
         </Field>
         <Field label="State or province">
-          <input className={inputClass} value={formData.state ?? ""} onChange={(event) => updateField("state", event.target.value)} />
+          <input
+            className={inputClass}
+            value={formData.state ?? ""}
+            onChange={(event) => updateField("state", event.target.value)}
+            placeholder="Optional, but helps narrow the location"
+          />
         </Field>
         <Field label="Country">
-          <input className={inputClass} value={formData.country} onChange={(event) => updateField("country", event.target.value)} />
+          <input
+            className={inputClass}
+            value={formData.country}
+            onChange={(event) => updateField("country", event.target.value)}
+            placeholder="Country"
+          />
         </Field>
         <Field label="Timezone">
-          <input className={inputClass} value={formData.timezone} onChange={(event) => updateField("timezone", event.target.value)} />
+          <input
+            className={inputClass}
+            value={formData.timezone}
+            onChange={(event) => updateField("timezone", event.target.value)}
+            placeholder="Auto-filled after selecting a location"
+          />
         </Field>
         <Field label="Latitude">
           <input

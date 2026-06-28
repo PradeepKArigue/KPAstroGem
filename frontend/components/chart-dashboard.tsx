@@ -111,6 +111,23 @@ export function ChartDashboard({ chartId }: { chartId: string }) {
         </div>
       </section>
 
+      <section className="glass-panel p-6 sm:p-8">
+        <p className="section-title">Viewing Chart For</p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryBadge label="Name" value={chartData.birthSummary.name} />
+          <SummaryBadge label="Date of birth" value={chartData.birthSummary.dateOfBirth} />
+          <SummaryBadge label="Time of birth" value={chartData.birthSummary.timeOfBirth} />
+          <SummaryBadge
+            label="Birth location"
+            value={`${chartData.birthSummary.birthPlace}, ${chartData.birthSummary.country}`}
+          />
+        </div>
+        <p className="mt-5 rounded-2xl border border-saffron/40 bg-saffron/10 px-4 py-3 text-sm leading-7 text-midnight/75">
+          Always verify these birth details before trusting the chart, questions, or Jathakam report. Opening an older
+          chart URL will show the data saved in that chart session, not the latest form entry.
+        </p>
+      </section>
+
       <section className="grid gap-6 xl:grid-cols-[1fr_0.92fr]">
         <div className="glass-panel p-6 sm:p-8">
           <p className="section-title">Birth Summary</p>

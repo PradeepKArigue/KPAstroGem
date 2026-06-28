@@ -113,6 +113,15 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
             Back to Dashboard
           </Link>
         </div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SessionBadge label="Name" value={session.chartData.birthSummary.name} />
+          <SessionBadge label="Date of birth" value={session.chartData.birthSummary.dateOfBirth} />
+          <SessionBadge label="Time of birth" value={session.chartData.birthSummary.timeOfBirth} />
+          <SessionBadge
+            label="Birth location"
+            value={`${session.chartData.birthSummary.birthPlace}, ${session.chartData.birthSummary.country}`}
+          />
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
@@ -252,6 +261,15 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
           </div>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+function SessionBadge({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-aurora/75">{label}</p>
+      <p className="mt-2 text-sm text-midnight/75">{value}</p>
     </div>
   );
 }
