@@ -362,6 +362,7 @@ def build_chart(payload: ChartCalculationRequest) -> ChartData:
 def build_question_answer(chart: ChartData, question: str, optional_date_range: str | None) -> ChartQuestionResponse:
     topic = _infer_topic(question, chart.birth_summary.question_category)
     topic_context = TOPIC_CONTEXT.get(topic.name, TOPIC_CONTEXT["Career"])
+    current_age = _current_age(chart.birth_summary.date_of_birth)
     lagna_cusp = chart.house_cusps[0]
     relevant_cusps = [chart.house_cusps[house - 1] for house in topic.house_focus]
     dominant_cusp = relevant_cusps[0]
@@ -386,6 +387,8 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         cusp for cusp in chart.house_cusps if cusp.house in topic_context["challenging"] and cusp.sub_lord in active_dasha_lords
     ]
     trend = _derive_trend(support_score, challenge_score, len(active_obstructions))
+    is_minor_career_question = topic.name == "Career" and current_age < 18
+    profession_signature = _describe_profession_signature(linked_planets, dominant_cusp)
 
     cusp_sub_lord_analysis = [
         (
@@ -425,6 +428,16 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         ),
         f"Timing emphasis is being framed around {optional_date_range or chart.dasha_summary.window}.",
     ]
+    if is_minor_career_question:
+        dasha_support = [
+            (
+                f"The native is currently {current_age} years old, so this career question is being read as a future profession and development question, not as immediate job-entry timing."
+            ),
+            (
+                f"Professional inclination currently leans toward {profession_signature} when the chart is read through house {dominant_cusp.house} and the stronger significators."
+            ),
+            *_build_minor_career_yearly_outlook(current_age),
+        ]
     supporting_factors = [
         (
             f"The computed trend for this topic is {trend}, because the chart keeps returning the supporting houses "
@@ -440,6 +453,13 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
             "to the computed birth profile rather than a generic template."
         ),
     ]
+    if is_minor_career_question:
+        supporting_factors.insert(
+            0,
+            (
+                f"Age-aware chart reading is active here, so the app is prioritizing aptitude, stream formation, and future career direction over present-day employment events."
+            ),
+        )
     blocking_factors = [
         (
             f"Challenging houses {', '.join(str(house) for house in sorted(topic_context['challenging']))} still need "
@@ -459,6 +479,9 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         topic_context=topic_context,
         linked_planets=linked_planets,
         timing_window=optional_date_range or chart.dasha_summary.window,
+        current_age=current_age,
+        profession_signature=profession_signature,
+        is_minor_career_question=is_minor_career_question,
     )
 
     caution_disclaimer = (
@@ -501,6 +524,17 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         ),
         "The automated answer should be read as a structured KP-style briefing, not as a substitute for a fully audited consultation.",
     ]
+    if is_minor_career_question:
+        interpretation.insert(
+            2,
+            (
+                f"Because the native is currently {current_age} years old, this should be read for future profession direction rather than immediate job timing."
+            ),
+        )
+        interpretation.insert(
+            3,
+            f"The chart's present profession signature leans toward {profession_signature}.",
+        )
     confidence = ConfidenceLevel(
         level="medium",
         reason="The astronomical chart and dasha timing are computed, but the automated interpretive rule base is still being deepened.",
@@ -514,6 +548,12 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         CalculationTrailEntry(
             step="House mapping",
             detail=f"Selected houses {', '.join(str(house) for house in topic.house_focus)} for this topic.",
+        ),
+        CalculationTrailEntry(
+            step="Age context",
+            detail=(
+                f"Computed current age as {current_age}. {'Applied child-career reframing logic.' if is_minor_career_question else 'No child-career reframing was needed.'}"
+            ),
         ),
         CalculationTrailEntry(
             step="Cusp review",
@@ -818,14 +858,24 @@ def _build_plain_explanation(
     topic_context: dict[str, object],
     linked_planets: list[PlanetaryPosition],
     timing_window: str,
+    current_age: int,
+    profession_signature: str,
+    is_minor_career_question: bool,
 ) -> str:
     concern = _describe_concern(question, topic_name)
     lead_planet = linked_planets[0].planet if linked_planets else moon.planet
     trend_phrase = _describe_trend_phrase(topic_name, trend, topic_context)
-    timing_phrase = (
-        f"The strongest timing focus in this answer is {timing_window}, under the active dasha chain "
-        f"{chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / {chart.dasha_summary.antara}."
-    )
+    if is_minor_career_question:
+        timing_phrase = (
+            f"Because the native is currently {current_age} years old, this should not be read as current job timing. "
+            f"Instead, the chart is being read for future profession direction, development years, and eventual entry into working life. "
+            f"The strongest immediate timing focus stays at {timing_window}, but for career matters it should be treated as a formative period rather than a literal employment window."
+        )
+    else:
+        timing_phrase = (
+            f"The strongest timing focus in this answer is {timing_window}, under the active dasha chain "
+            f"{chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / {chart.dasha_summary.antara}."
+        )
     chart_phrase = (
         f"This reading is being anchored through {chart.house_cusps[0].sign} lagna, {moon.sign} janma rasi, "
         f"and {moon.nakshatra} nakshatra, with house {dominant_cusp.house} currently leading the topic through "
@@ -834,8 +884,15 @@ def _build_plain_explanation(
     emphasis_phrase = (
         f"Right now, {lead_planet} is carrying an important part of the active significator load for this question."
     )
+    profession_phrase = (
+        f"The longer-term professional signature currently leans toward {profession_signature}."
+        if is_minor_career_question
+        else ""
+    )
 
-    return " ".join([concern, trend_phrase, timing_phrase, chart_phrase, emphasis_phrase])
+    return " ".join(
+        part for part in [concern, trend_phrase, timing_phrase, profession_phrase, chart_phrase, emphasis_phrase] if part
+    )
 
 
 def _describe_concern(question: str, topic_name: str) -> str:
@@ -869,6 +926,73 @@ def _describe_trend_phrase(topic_name: str, trend: str, topic_context: dict[str,
         f"The current reading is mixed, so the chart shows both the possibility of {promise} and the need to watch "
         f"for {challenge} before making a strong conclusion."
     )
+
+
+def _current_age(date_of_birth: str, as_of: date | None = None) -> int:
+    today = as_of or date.today()
+    birth_date = date.fromisoformat(date_of_birth)
+    years = today.year - birth_date.year
+    if (today.month, today.day) < (birth_date.month, birth_date.day):
+        years -= 1
+    return max(years, 0)
+
+
+def _describe_profession_signature(linked_planets: list[PlanetaryPosition], dominant_cusp: HouseCusp) -> str:
+    domain_scores: dict[str, int] = {}
+    source_planets = [planet.planet for planet in linked_planets[:3]]
+    source_planets.extend([dominant_cusp.sign_lord, dominant_cusp.star_lord, dominant_cusp.sub_lord])
+
+    for planet_name in source_planets:
+        for domain in _planet_career_domains(planet_name):
+            domain_scores[domain] = domain_scores.get(domain, 0) + 1
+
+    if not domain_scores:
+        return "general professional development and skill-building roles"
+
+    ranked_domains = sorted(domain_scores.items(), key=lambda item: (-item[1], item[0]))
+    top_domains = [domain for domain, _ in ranked_domains[:3]]
+    if len(top_domains) == 1:
+        return top_domains[0]
+    if len(top_domains) == 2:
+        return f"{top_domains[0]} and {top_domains[1]}"
+    return f"{top_domains[0]}, {top_domains[1]}, and {top_domains[2]}"
+
+
+def _planet_career_domains(planet_name: str) -> list[str]:
+    mapping = {
+        "Sun": ["leadership, administration, and public-responsibility work"],
+        "Moon": ["care, education, and people-facing support work"],
+        "Mars": ["engineering, technical execution, and action-oriented work"],
+        "Mercury": ["analysis, communication, commerce, and technology-oriented work"],
+        "Jupiter": ["teaching, advisory, knowledge, and guidance-based work"],
+        "Venus": ["creative, design, presentation, and comfort-industry work"],
+        "Saturn": ["systems, discipline, engineering structure, and long-cycle responsibility"],
+        "Rahu": ["digital, unconventional, foreign-linked, and modern technical fields"],
+        "Ketu": ["research, diagnostics, specialist, and deep-focus work"],
+    }
+    return mapping.get(planet_name, ["general professional development and skill-building roles"])
+
+
+def _build_minor_career_yearly_outlook(current_age: int) -> list[str]:
+    current_year = date.today().year
+    outlook: list[str] = []
+
+    for offset, age in enumerate(range(current_age, min(19, current_age + 7))):
+        start_year = current_year + offset
+        end_year = start_year + 1
+        if age <= 11:
+            note = "This year should be read for learning foundation, curiosity, confidence, and early interests rather than profession selection."
+        elif age <= 13:
+            note = "This year should be read for skill formation, communication patterns, and the subjects or activities that begin to stand out."
+        elif age <= 15:
+            note = "This year should be read for stronger aptitude sorting, discipline, and clues about preferred academic or creative direction."
+        elif age <= 17:
+            note = "This year should be read for stream choice, exam direction, coaching, and more visible hints about future profession type."
+        else:
+            note = "This year begins to matter more seriously for course specialization, preparation, and eventual profession-entry direction."
+        outlook.append(f"Age {age} ({start_year}-{end_year}): {note}")
+
+    return outlook
 
 
 def _rank_significators(
