@@ -55,6 +55,13 @@ type ActiveDashaGuide = {
   meaning: string;
 };
 
+type DynamicTopicForecast = {
+  title: string;
+  emphasis: string;
+  timing: string;
+  reading: string;
+};
+
 export function ReportView({ chartId }: { chartId: string }) {
   const [session, setSession] = useState<ChartSessionResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -107,6 +114,7 @@ export function ReportView({ chartId }: { chartId: string }) {
   const birthDashaRows = buildBirthDashaRows(chartData);
   const lifetimeDashaRows = buildLifetimeDashaRows(chartData.lifetimeDashaTimeline);
   const activeDashaGuides = buildActiveDashaGuides(chartData.planetaryPositions, chartData.houseCusps, chartData.dashaSummary);
+  const dynamicTopicForecasts = buildDynamicTopicForecasts(chartData.birthSummary, chartData.houseCusps, chartData.dashaSummary);
   const dashaNarrative = buildCurrentDashaNarrative(
     chartData.birthSummary,
     chartData.planetaryPositions,
@@ -285,6 +293,28 @@ export function ReportView({ chartId }: { chartId: string }) {
             title="Dasha Judgment"
             detail="Maha dasha shows the broad life period, bhukti narrows the active theme, and antara acts like the immediate trigger layer for current events and shorter timing."
           />
+        </div>
+      </TableCard>
+
+      <TableCard title="Dynamic User-Specific KP Outlook">
+        <div className="grid gap-4 lg:grid-cols-2">
+          {dynamicTopicForecasts.map((item) => (
+            <div key={item.title} className="rounded-3xl bg-slate-50 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-lg font-semibold text-midnight">{item.title}</p>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-midnight/60">
+                  Personalized
+                </span>
+              </div>
+              <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm leading-7 text-midnight/70">
+                <span className="font-semibold text-midnight">KP emphasis:</span> {item.emphasis}
+              </p>
+              <p className="mt-3 rounded-2xl bg-white px-4 py-3 text-sm leading-7 text-midnight/70">
+                <span className="font-semibold text-midnight">Timing lens:</span> {item.timing}
+              </p>
+              <p className="mt-3 rounded-2xl bg-white px-4 py-3 text-sm leading-7 text-midnight/70">{item.reading}</p>
+            </div>
+          ))}
         </div>
       </TableCard>
 
@@ -702,6 +732,112 @@ function buildSingleDashaGuide(
     houseLinks,
     meaning,
   };
+}
+
+function buildDynamicTopicForecasts(
+  birthSummary: BirthSummary,
+  cusps: HouseCusp[],
+  dashaSummary: DashaSummary,
+): DynamicTopicForecast[] {
+  const age = calculateAge(birthSummary.dateOfBirth);
+  const primaryTopic = birthSummary.questionCategory;
+  const configs = [
+    { title: "Career", houses: [2, 6, 10, 11] },
+    { title: "Education", houses: [4, 5, 9, 11] },
+    { title: "Marriage", houses: [2, 7, 11] },
+    { title: "Health", houses: [1, 6, 8, 12] },
+    { title: "Finance", houses: [2, 6, 10, 11] },
+    { title: "Property", houses: [4, 11, 12] },
+  ];
+
+  return configs.map((config) => {
+    const selectedCusps = config.houses
+      .map((house) => cusps[house - 1])
+      .filter((cusp): cusp is HouseCusp => Boolean(cusp));
+    const emphasis = selectedCusps
+      .map((cusp) => `H${cusp.house} via ${cusp.signLord}/${cusp.starLord}/${cusp.subLord}`)
+      .join(" | ");
+    const timing = buildTopicTimingLens(config.title, age, dashaSummary, primaryTopic === config.title);
+    const reading = buildTopicReading(config.title, age, selectedCusps, dashaSummary, primaryTopic === config.title);
+
+    return {
+      title: primaryTopic === config.title ? `${config.title} | Primary User Topic` : config.title,
+      emphasis,
+      timing,
+      reading,
+    };
+  });
+}
+
+function buildTopicTimingLens(
+  title: string,
+  age: number,
+  dashaSummary: DashaSummary,
+  isPrimary: boolean,
+) {
+  const topicPhrase = isPrimary ? "This is the topic chosen in the user session." : "This is a supporting topic view.";
+
+  if (age < 18 && title === "Career") {
+    return `${topicPhrase} Read the current ${dashaSummary.mahaDasha}/${dashaSummary.bhukti}/${dashaSummary.antara} chain as aptitude and future profession formation, not immediate employment timing.`;
+  }
+
+  if (age < 18 && title === "Education") {
+    return `${topicPhrase} Read the current dasha chain as school growth, subject attraction, stream sorting, and examination readiness through the active window ${dashaSummary.window}.`;
+  }
+
+  if (age < 18) {
+    return `${topicPhrase} Because the native is ${age}, this topic should be judged as pattern-building and maturity development through the active window ${dashaSummary.window}, not literal adult-event timing.`;
+  }
+
+  return `${topicPhrase} The current timing lens is ${dashaSummary.mahaDasha}/${dashaSummary.bhukti}/${dashaSummary.antara} with active window ${dashaSummary.window}.`;
+}
+
+function buildTopicReading(
+  title: string,
+  age: number,
+  cusps: HouseCusp[],
+  dashaSummary: DashaSummary,
+  isPrimary: boolean,
+) {
+  const houseLead = cusps[0];
+  const houseSummary = cusps.map((cusp) => `house ${cusp.house}`).join(", ");
+
+  if (age < 18 && title === "Career") {
+    return `The chart should be read for future profession direction. ${houseLead ? `The lead comes from house ${houseLead.house} through ${houseLead.signLord}, ${houseLead.starLord}, and ${houseLead.subLord}.` : ""} This is the right phase to judge strengths, interests, study pattern, and later job nature rather than asking whether work starts right now.`;
+  }
+
+  if (age < 18 && title === "Education") {
+    return `This chart is in a strong age-relevant education phase. Houses ${houseSummary} should be watched for how learning confidence, memory, discipline, and stream direction develop under ${dashaSummary.mahaDasha}/${dashaSummary.bhukti}/${dashaSummary.antara}.`;
+  }
+
+  if (age < 18 && title === "Marriage") {
+    return `For a minor, this should be read as future relationship maturity and emotional pattern, not literal marriage timing. The chart can still show the style of bonding and later commitment tendency through ${houseSummary}.`;
+  }
+
+  if (age < 18 && title === "Health") {
+    return `For a minor, health should be read through resilience, care routine, monitoring, and sensitivity management. The chart should guide where attention is needed, while real health decisions must still depend on qualified medical advice.`;
+  }
+
+  if (age < 18 && title === "Finance") {
+    return `At this age, finance should be read as future earning style, resource attitude, and money-handling tendency. The chart is better at showing later material pattern than present financial outcome.`;
+  }
+
+  if (age < 18 && title === "Property") {
+    return `At this age, property should be read through family environment, domestic support, and future settlement tendency rather than direct acquisition timing.`;
+  }
+
+  return `${isPrimary ? "This is the user's main question area." : "This is a secondary topic reading."} The topic is presently led by ${houseSummary}, and the current dasha chain should be compared directly against those house links before giving final KP judgment.`;
+}
+
+function calculateAge(dateOfBirth: string) {
+  const today = new Date();
+  const birth = new Date(`${dateOfBirth}T00:00:00`);
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDelta = today.getMonth() - birth.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birth.getDate())) {
+    age -= 1;
+  }
+  return Math.max(age, 0);
 }
 
 function deriveOccupiedHouse(planet: PlanetaryPosition, cusps: HouseCusp[]) {
