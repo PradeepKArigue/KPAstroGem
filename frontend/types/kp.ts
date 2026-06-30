@@ -100,6 +100,9 @@ export type DashaSummary = {
   bhukti: string;
   antara: string;
   window: string;
+  mahaWindow: string;
+  bhuktiWindow: string;
+  antaraWindow: string;
   status: string;
   note: string;
 };

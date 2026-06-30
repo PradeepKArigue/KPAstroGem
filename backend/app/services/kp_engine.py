@@ -368,6 +368,11 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
     moon = _find_planet_model(chart.planetary_positions, "Moon")
     antara_planet = _find_planet_model(chart.planetary_positions, chart.dasha_summary.antara)
     scored_significators = _rank_significators(chart.planetary_positions, chart.house_cusps, topic.house_focus)
+    obstructing_significators = _rank_significators(
+        chart.planetary_positions,
+        chart.house_cusps,
+        sorted(topic_context["challenging"]),
+    )
     linked_planets = [item.planet for item in scored_significators[:3]]
     active_dasha_lords = {
         chart.dasha_summary.maha_dasha,
@@ -375,9 +380,12 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         chart.dasha_summary.antara,
     }
     current_week = _current_week_window()
-    support_house_hits = sum(1 for cusp in relevant_cusps if cusp.house in topic_context["supporting"])
-    challenge_house_hits = sum(1 for cusp in chart.house_cusps if cusp.house in topic_context["challenging"] and cusp.sub_lord in active_dasha_lords)
-    trend = "supportive" if support_house_hits >= challenge_house_hits else "mixed"
+    support_score = sum(item.score for item in scored_significators[:3])
+    challenge_score = sum(item.score for item in obstructing_significators[:3])
+    active_obstructions = [
+        cusp for cusp in chart.house_cusps if cusp.house in topic_context["challenging"] and cusp.sub_lord in active_dasha_lords
+    ]
+    trend = _derive_trend(support_score, challenge_score, len(active_obstructions))
 
     cusp_sub_lord_analysis = [
         (
@@ -420,7 +428,8 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
     supporting_factors = [
         (
             f"The computed trend for this topic is {trend}, because the chart keeps returning the supporting houses "
-            f"{', '.join(str(house) for house in sorted(topic_context['supporting']))} in the active KP chain."
+            f"{', '.join(str(house) for house in sorted(topic_context['supporting']))} with support score {support_score} "
+            f"against challenge score {challenge_score}."
         ),
         (
             f"Relevant house lords cluster around {', '.join(sorted({cusp.star_lord for cusp in relevant_cusps}))} "
@@ -434,7 +443,8 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
     blocking_factors = [
         (
             f"Challenging houses {', '.join(str(house) for house in sorted(topic_context['challenging']))} still need "
-            "to be watched because they can convert promise into delay if they dominate the sub-lord layer."
+            f"to be watched because they can convert promise into delay if they dominate the sub-lord layer. "
+            f"Current active obstruction count is {len(active_obstructions)}."
         ),
         "Automated event-promise ranking is stronger now, but still lighter than a full human KP consultation with rectification.",
         "Narrow timing beyond the active dasha chain should still be reviewed carefully against exact birth-time confidence.",
@@ -703,6 +713,9 @@ def _build_dasha_summary(birth_utc: datetime, moon_longitude: float) -> DashaPer
         bhukti=current_bhukti.lord,
         antara=current_antara.lord,
         window=f"{current_antara.start.date().isoformat()} to {current_antara.end.date().isoformat()}",
+        mahaWindow=f"{current_maha.start.date().isoformat()} to {current_maha.end.date().isoformat()}",
+        bhuktiWindow=f"{current_bhukti.start.date().isoformat()} to {current_bhukti.end.date().isoformat()}",
+        antaraWindow=f"{current_antara.start.date().isoformat()} to {current_antara.end.date().isoformat()}",
         status="Computed",
         note=(
             f"Computed from Moon longitude in {NAKSHATRAS[int((moon_longitude % 360) // NAKSHATRA_SPAN)]}. "
@@ -771,6 +784,15 @@ def _select_linked_planets(
     if linked:
         return linked
     return planetary_positions[:2]
+
+
+def _derive_trend(support_score: int, challenge_score: int, active_obstruction_count: int) -> str:
+    adjusted_challenge = challenge_score + (active_obstruction_count * 2)
+    if support_score >= adjusted_challenge + 4:
+        return "supportive"
+    if adjusted_challenge > support_score:
+        return "challenging"
+    return "mixed"
 
 
 def _rank_significators(

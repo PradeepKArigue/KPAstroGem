@@ -35,7 +35,7 @@ type PlanetDerivedDetails = {
   occupiedHouse: number | null;
   starLordHouse: number | null;
   subLordHouse: number | null;
-  signLordHouse: number | null;
+  signLordHouses: number[];
   activationByHouse: RelationshipStrength[];
 };
 
@@ -244,20 +244,20 @@ export function ReportView({ chartId }: { chartId: string }) {
         />
       </TableCard>
 
-      <TableCard title="Derived KP Significator Matrix">
-        <DenseTable
-          headers={["Planet", "Occupied", "Sign Lord", "Star Lord", "Sub Lord", "KP Reading"]}
-          rows={chartData.planetaryPositions.map((planet) => {
-            const derived = derivedPlanetDetails[planet.planet];
-            return [
-              planet.planet,
-              formatHouseRef(derived.occupiedHouse),
-              formatHouseRef(derived.signLordHouse),
-              formatHouseRef(derived.starLordHouse),
-              formatHouseRef(derived.subLordHouse),
-              buildShortKPReading(planet, derived),
-            ];
-          })}
+        <TableCard title="Derived KP Significator Matrix">
+          <DenseTable
+            headers={["Planet", "Occupied", "Sign Lord", "Star Lord", "Sub Lord", "KP Reading"]}
+            rows={chartData.planetaryPositions.map((planet) => {
+              const derived = derivedPlanetDetails[planet.planet];
+              return [
+                planet.planet,
+                formatHouseRef(derived.occupiedHouse),
+                formatHouseRefs(derived.signLordHouses),
+                formatHouseRef(derived.starLordHouse),
+                formatHouseRef(derived.subLordHouse),
+                buildShortKPReading(planet, derived),
+              ];
+            })}
         />
       </TableCard>
 
@@ -320,9 +320,9 @@ export function ReportView({ chartId }: { chartId: string }) {
         </div>
       </TableCard>
 
-      <TableCard title="Topic Readiness Snapshot">
+      <TableCard title="Topic Quick Reference">
         <div className="grid gap-3 lg:grid-cols-2">
-          {buildTopicReadinessRows(chartData.houseCusps).map((item) => (
+          {buildTopicReadinessRows(chartData.houseCusps, chartData.dashaSummary).map((item) => (
             <ReadingStep key={item.title} title={item.title} detail={item.detail} />
           ))}
         </div>
@@ -420,17 +420,17 @@ function buildPlanetDerivedDetails(planets: PlanetaryPosition[], cusps: HouseCus
     const occupiedHouse = houseByPlanet.get(planet.planet) ?? null;
     const starLordHouse = houseByPlanet.get(planet.starLord) ?? null;
     const subLordHouse = houseByPlanet.get(planet.subLord) ?? null;
-    const signLordHouse = findHouseByLord(cusps, signLords[planet.sign]);
+    const signLordHouses = findHousesByLord(cusps, signLords[planet.sign]);
     const activationByHouse = Array.from({ length: 12 }, (_, index) => {
       const houseNumber = index + 1;
-      return deriveRelationshipStrength(houseNumber, occupiedHouse, signLordHouse, starLordHouse, subLordHouse);
+      return deriveRelationshipStrength(houseNumber, occupiedHouse, signLordHouses, starLordHouse, subLordHouse);
     });
 
     details[planet.planet] = {
       occupiedHouse,
       starLordHouse,
       subLordHouse,
-      signLordHouse,
+      signLordHouses,
       activationByHouse,
     };
   }
@@ -438,19 +438,18 @@ function buildPlanetDerivedDetails(planets: PlanetaryPosition[], cusps: HouseCus
   return details;
 }
 
-function findHouseByLord(cusps: HouseCusp[], lord: string | undefined): number | null {
-  const match = cusps.find((cusp) => cusp.signLord === lord);
-  return match?.house ?? null;
+function findHousesByLord(cusps: HouseCusp[], lord: string | undefined): number[] {
+  return cusps.filter((cusp) => cusp.signLord === lord).map((cusp) => cusp.house);
 }
 
 function deriveRelationshipStrength(
   houseNumber: number,
   occupiedHouse: number | null,
-  signLordHouse: number | null,
+  signLordHouses: number[],
   starLordHouse: number | null,
   subLordHouse: number | null,
 ): RelationshipStrength {
-  if (houseNumber === occupiedHouse || houseNumber === signLordHouse) {
+  if (houseNumber === occupiedHouse || signLordHouses.includes(houseNumber)) {
     return "L4";
   }
 
@@ -487,6 +486,7 @@ function wrapHouse(house: number) {
 function buildShortKPReading(position: PlanetaryPosition, derived: PlanetDerivedDetails) {
   return [
     `${position.planet} links to ${formatHouseRef(derived.occupiedHouse)} by placement`,
+    `${formatHouseRefs(derived.signLordHouses)} through sign lord ${signLords[position.sign]}`,
     `${formatHouseRef(derived.starLordHouse)} through star lord ${position.starLord}`,
     `${formatHouseRef(derived.subLordHouse)} through sub lord ${position.subLord}`,
   ].join("; ");
@@ -497,19 +497,19 @@ function buildDashaRows(dashaSummary: DashaSummary): DashaPeriodRow[] {
     {
       level: "Maha Dasha",
       ruler: dashaSummary.mahaDasha,
-      window: dashaSummary.window,
+      window: dashaSummary.mahaWindow,
       focus: `${dashaSummary.mahaDasha} sets the long-wave life agenda behind the current reading.`,
     },
     {
       level: "Bhukti",
       ruler: dashaSummary.bhukti,
-      window: dashaSummary.window,
+      window: dashaSummary.bhuktiWindow,
       focus: `${dashaSummary.bhukti} refines how the present period expresses the larger dasha promise.`,
     },
     {
       level: "Antara",
       ruler: dashaSummary.antara,
-      window: dashaSummary.window,
+      window: dashaSummary.antaraWindow,
       focus: `${dashaSummary.antara} acts as the immediate trigger layer for current-week interpretation.`,
     },
   ];
@@ -551,7 +551,11 @@ function formatHouseRef(house: number | null) {
   return house == null ? "Pending" : `House ${house}`;
 }
 
-function buildTopicReadinessRows(cusps: HouseCusp[]) {
+function formatHouseRefs(houses: number[]) {
+  return houses.length > 0 ? houses.map((house) => `House ${house}`).join(", ") : "Pending";
+}
+
+function buildTopicReadinessRows(cusps: HouseCusp[], dashaSummary: DashaSummary) {
   const configurations = [
     { title: "Career", houses: [2, 6, 10, 11] },
     { title: "Marriage", houses: [2, 7, 11] },
@@ -565,8 +569,8 @@ function buildTopicReadinessRows(cusps: HouseCusp[]) {
       .filter((cusp): cusp is HouseCusp => Boolean(cusp));
     const emphasis = selectedCusps.map((cusp) => `H${cusp.house}:${cusp.subLord}`).join(", ");
     return {
-      title: `${config.title} readiness`,
-      detail: `Key sub-lord chain for houses ${config.houses.join(", ")} is ${emphasis}. Read these first when judging ${config.title.toLowerCase()} promise and timing.`,
+      title: `${config.title} quick reference`,
+      detail: `Key sub-lord chain for houses ${config.houses.join(", ")} is ${emphasis}. Compare these first with the active dasha lords ${dashaSummary.mahaDasha}, ${dashaSummary.bhukti}, and ${dashaSummary.antara} when judging ${config.title.toLowerCase()} promise and timing.`,
     };
   });
 }

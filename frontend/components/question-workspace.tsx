@@ -105,11 +105,11 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
           <div>
             <p className="section-title">Ask a KP Question</p>
             <h1 className="mt-3 font-[family-name:var(--font-heading)] text-4xl font-semibold text-midnight">
-              Question workspace for {session.chartData.birthSummary.name}
+              Interactive KP Reading
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-midnight/70">
-              This flow keeps the chart context, mapped topic houses, question history, and interpretation notes
-              together so the reading feels consistent from one question to the next.
+              Ask follow-up questions against the same computed chart and keep the reading consistent across
+              timing, significators, and active dasha context.
             </p>
           </div>
           <Link href={`/dashboard/${chartId}`} className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-midnight transition hover:border-aurora hover:text-aurora">
@@ -140,7 +140,7 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
         <form className="glass-panel p-6 sm:p-8" onSubmit={handleSubmit}>
           <p className="section-title">Question Input</p>
           <h2 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold text-midnight">
-            Ask with a chart-specific context
+            Ask with chart-specific timing and topic context
           </h2>
 
           <div className="mt-6 rounded-3xl bg-slate-50 p-5">
@@ -201,7 +201,7 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
         </form>
 
         <aside className="glass-panel p-6 sm:p-8">
-          <p className="section-title">Supported Topics</p>
+          <p className="section-title">Question Themes</p>
           <div className="mt-5 space-y-3">
             {topics.map((topic) => (
               <div key={topic.name} className="rounded-2xl bg-slate-50 p-4">
@@ -221,7 +221,7 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-aurora/80">You asked</p>
                     <p className="mt-2 font-semibold text-midnight">{item.question}</p>
                     <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-midnight/60">KP response</p>
-                    <p className="mt-2 text-sm leading-6 text-midnight/70">{item.interpretation[0]}</p>
+                    <p className="mt-2 text-sm leading-6 text-midnight/70">{pickHistoryPreview(item)}</p>
                   </div>
                 ))}
               </div>
@@ -309,5 +309,9 @@ function AnswerList({ title, items }: { title: string; items: string[] }) {
       </ul>
     </div>
   );
+}
+
+function pickHistoryPreview(item: ChartQuestionResponse) {
+  return item.interpretation[3] ?? item.interpretation[1] ?? item.interpretation[0] ?? "Answer summary unavailable.";
 }
 

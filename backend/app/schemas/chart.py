@@ -73,6 +73,9 @@ class DashaPeriod(BaseModel):
     bhukti: str
     antara: str
     window: str
+    maha_window: str = Field(..., alias="mahaWindow")
+    bhukti_window: str = Field(..., alias="bhuktiWindow")
+    antara_window: str = Field(..., alias="antaraWindow")
     status: str
     note: str
 
