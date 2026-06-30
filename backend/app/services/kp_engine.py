@@ -432,6 +432,14 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         current_age=current_age,
         profession_signature=profession_signature,
     )
+    minor_projection = _build_minor_projection(
+        chart=chart,
+        topic_name=topic.name,
+        current_age=current_age,
+        dominant_cusp=dominant_cusp,
+        linked_planets=linked_planets,
+        profession_signature=profession_signature,
+    )
 
     cusp_sub_lord_analysis = [
         (
@@ -472,11 +480,13 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         f"Timing emphasis is being framed around {optional_date_range or chart.dasha_summary.window}.",
     ]
     if age_context["is_minor"]:
-        dasha_support = [
-            str(age_context["timing_intro"]),
-            str(age_context["direction_line"]).format(house=dominant_cusp.house, profession=profession_signature),
-            *_build_minor_topic_yearly_outlook(topic.name, current_age),
-        ]
+        dasha_support = list(minor_projection["dasha_lines"] if minor_projection else [])
+        if not dasha_support:
+            dasha_support = [
+                str(age_context["timing_intro"]),
+                str(age_context["direction_line"]).format(house=dominant_cusp.house, profession=profession_signature),
+                *_build_minor_topic_yearly_outlook(topic.name, current_age),
+            ]
     supporting_factors = [
         (
             f"The computed trend for this topic is {trend}, because the chart keeps returning the supporting houses "
@@ -497,6 +507,8 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
             0,
             str(age_context["support_line"]),
         )
+    if minor_projection and minor_projection["support_line"]:
+        supporting_factors.insert(1, str(minor_projection["support_line"]))
     blocking_factors = [
         (
             f"Challenging houses {', '.join(str(house) for house in sorted(topic_context['challenging']))} still need "
@@ -519,6 +531,7 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         current_age=current_age,
         profession_signature=profession_signature,
         age_context=age_context,
+        minor_projection=minor_projection,
     )
 
     caution_disclaimer = (
@@ -570,6 +583,8 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
             3,
             str(age_context["interpretation_direction"]).format(profession=profession_signature),
         )
+    if minor_projection and minor_projection["interpretation_line"]:
+        interpretation.insert(4 if age_context["is_minor"] else 2, str(minor_projection["interpretation_line"]))
     confidence = ConfidenceLevel(
         level="medium",
         reason="The astronomical chart and dasha timing are computed, but the automated interpretive rule base is still being deepened.",
@@ -587,6 +602,10 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         CalculationTrailEntry(
             step="Age context",
             detail=f"Computed current age as {current_age}. {age_context['trail_note']}",
+        ),
+        CalculationTrailEntry(
+            step="Life-stage projection",
+            detail=str(minor_projection["trail_note"]) if minor_projection else "No extra life-stage projection was needed.",
         ),
         CalculationTrailEntry(
             step="Cusp review",
@@ -980,6 +999,7 @@ def _build_plain_explanation(
     current_age: int,
     profession_signature: str,
     age_context: dict[str, str | bool],
+    minor_projection: dict[str, str | list[str]] | None,
 ) -> str:
     concern = _describe_concern(question, topic_name)
     lead_planet = linked_planets[0].planet if linked_planets else moon.planet
@@ -1007,9 +1027,12 @@ def _build_plain_explanation(
         if age_context["is_minor"]
         else ""
     )
+    projection_phrase = str(minor_projection["plain_line"]) if minor_projection else ""
 
     return " ".join(
-        part for part in [concern, trend_phrase, timing_phrase, profession_phrase, chart_phrase, emphasis_phrase] if part
+        part
+        for part in [concern, trend_phrase, timing_phrase, profession_phrase, projection_phrase, chart_phrase, emphasis_phrase]
+        if part
     )
 
 
@@ -1022,7 +1045,7 @@ def _describe_concern(question: str, topic_name: str) -> str:
     if any(keyword in normalized for keyword in ["marriage", "partner", "relationship"]):
         return "For this relationship question, the app is reading the chart as a question of commitment timing and emotional stability."
     if any(keyword in normalized for keyword in ["job", "career", "promotion", "work"]):
-        return "For this career question, the app is reading the chart mainly through progress, stability, and timing of opportunity."
+        return "For this career question, the app is reading the chart in KP style through houses 2, 6, 10, and 11, with special attention to profession promise, development stage, and realistic timing."
     if any(keyword in normalized for keyword in ["business", "finance", "money", "wealth"]):
         return "For this practical-life question, the app is reading the chart through future responsibility, skill-use, and the kind of life pattern the native may grow into."
     if topic_name == "Health Caution":
@@ -1142,6 +1165,187 @@ def _build_age_context(topic_name: str, current_age: int, profession_signature: 
         "plain_timing_intro": "",
         "plain_direction": "",
     }
+
+
+def _build_minor_projection(
+    *,
+    chart: ChartData,
+    topic_name: str,
+    current_age: int,
+    dominant_cusp: HouseCusp,
+    linked_planets: list[PlanetaryPosition],
+    profession_signature: str,
+) -> dict[str, str | list[str]] | None:
+    if current_age >= 18:
+        return None
+
+    if topic_name == "Career":
+        return _build_minor_career_projection(chart, current_age, dominant_cusp, linked_planets, profession_signature)
+    if topic_name == "Education":
+        return _build_minor_education_projection(chart, current_age, dominant_cusp, profession_signature)
+    return None
+
+
+def _build_minor_career_projection(
+    chart: ChartData,
+    current_age: int,
+    dominant_cusp: HouseCusp,
+    linked_planets: list[PlanetaryPosition],
+    profession_signature: str,
+) -> dict[str, str | list[str]]:
+    school_end_age = max(17, min(18, current_age + max(18 - current_age, 0)))
+    stream_start_age = min(max(current_age + 2, 14), 16)
+    stream_end_age = max(stream_start_age + 1, 17)
+    training_start_age = max(stream_end_age, 17)
+    training_end_age = training_start_age + _training_year_span(profession_signature)
+    entry_start_age, entry_end_age = _profession_entry_age_band(profession_signature)
+    school_years_left = max(school_end_age - current_age, 1)
+    study_to_entry_years = max(entry_start_age - current_age, 1)
+    source_planets = [planet.planet for planet in linked_planets[:2]] or [dominant_cusp.sign_lord, dominant_cusp.star_lord]
+    role_examples = _profession_role_examples(source_planets, profession_signature)
+    stream_window = _age_year_window(chart.birth_summary.date_of_birth, stream_start_age, stream_end_age)
+    training_window = _age_year_window(chart.birth_summary.date_of_birth, training_start_age, training_end_age)
+    entry_window = _age_year_window(chart.birth_summary.date_of_birth, entry_start_age, entry_end_age)
+    entry_dasha = _timeline_window_for_age_band(chart.lifetime_dasha_timeline, entry_start_age, entry_end_age)
+
+    plain_line = (
+        f"In practical life terms, the native is likely to stay in structured study for about another {school_years_left} year"
+        f"{'' if school_years_left == 1 else 's'}, with stronger stream-selection years around age {stream_start_age} to {stream_end_age} "
+        f"({stream_window}). Higher-study or professional training is more likely around age {training_start_age} to {training_end_age} "
+        f"({training_window}), and actual job-entry promise should be judged more seriously around age {entry_start_age} to {entry_end_age} "
+        f"({entry_window}), not in the present child-age window. The profession pattern currently points most strongly toward {profession_signature}, "
+        f"which can show up later as roles such as {role_examples}."
+    )
+    interpretation_line = (
+        f"KP life-stage judgment: age {current_age} is still a preparation phase; age {stream_start_age}-{stream_end_age} is better for stream sorting, "
+        f"age {training_start_age}-{training_end_age} for training, and age {entry_start_age}-{entry_end_age} for clearer profession-entry signals. "
+        f"The house {dominant_cusp.house} chain {dominant_cusp.sign_lord}/{dominant_cusp.star_lord}/{dominant_cusp.sub_lord} currently favors {profession_signature}."
+    )
+    support_line = (
+        f"The answer is now being framed through human life-stage logic as well as KP logic: about {study_to_entry_years} more years remain before the chart should be tested for literal job-entry timing, "
+        f"so the current period is better for aptitude, stream, and training analysis."
+    )
+    dasha_lines = [
+        f"The native is currently {current_age} years old, so the present chart period is not being treated as literal employment timing.",
+        f"Age {stream_start_age} to {stream_end_age} ({stream_window}) is the stronger window for stream selection, interest sorting, and noticing whether the chart leans more toward {profession_signature}.",
+        f"Age {training_start_age} to {training_end_age} ({training_window}) is better for higher study, coaching, professional preparation, and skill consolidation.",
+        f"Age {entry_start_age} to {entry_end_age} ({entry_window}) is the first more realistic band for job-entry judgment. {entry_dasha}",
+        *_build_minor_topic_yearly_outlook("Career", current_age),
+    ]
+    return {
+        "plain_line": plain_line,
+        "interpretation_line": interpretation_line,
+        "support_line": support_line,
+        "dasha_lines": dasha_lines,
+        "trail_note": (
+            f"Projected school years left={school_years_left}, stream window age {stream_start_age}-{stream_end_age}, "
+            f"training window age {training_start_age}-{training_end_age}, and entry window age {entry_start_age}-{entry_end_age}."
+        ),
+    }
+
+
+def _build_minor_education_projection(
+    chart: ChartData,
+    current_age: int,
+    dominant_cusp: HouseCusp,
+    profession_signature: str,
+) -> dict[str, str | list[str]]:
+    stream_start_age = min(max(current_age + 2, 14), 16)
+    stream_end_age = max(stream_start_age + 1, 17)
+    stream_window = _age_year_window(chart.birth_summary.date_of_birth, stream_start_age, stream_end_age)
+    plain_line = (
+        f"The chart should be read with present schooling in mind. The stronger sorting years for subject preference and later stream clarity are around age "
+        f"{stream_start_age} to {stream_end_age} ({stream_window}), and the current educational signature leans toward {profession_signature}."
+    )
+    interpretation_line = (
+        f"KP education judgment: house {dominant_cusp.house} with {dominant_cusp.sign_lord}/{dominant_cusp.star_lord}/{dominant_cusp.sub_lord} should be used to watch memory, discipline, "
+        f"subject affinity, and eventual stream choice rather than forcing an adult profession promise too early."
+    )
+    return {
+        "plain_line": plain_line,
+        "interpretation_line": interpretation_line,
+        "support_line": "The answer is being adjusted for school-age reality, so current years are read more for subject direction than for final-life outcome.",
+        "dasha_lines": [
+            f"The native is currently {current_age} years old, so the present educational reading is about growth, subject comfort, and future stream clarity.",
+            f"Age {stream_start_age} to {stream_end_age} ({stream_window}) should be watched more carefully for clearer academic direction and stronger specialization signals.",
+            *_build_minor_topic_yearly_outlook("Education", current_age),
+        ],
+        "trail_note": f"Projected education-stream window at age {stream_start_age}-{stream_end_age}.",
+    }
+
+
+def _training_year_span(profession_signature: str) -> int:
+    normalized = profession_signature.lower()
+    if any(keyword in normalized for keyword in ["teaching", "advisory", "guidance", "research", "diagnostics", "specialist"]):
+        return 5
+    if any(keyword in normalized for keyword in ["engineering", "analysis", "technology", "digital", "technical"]):
+        return 4
+    return 3
+
+
+def _profession_entry_age_band(profession_signature: str) -> tuple[int, int]:
+    normalized = profession_signature.lower()
+    if any(keyword in normalized for keyword in ["teaching", "advisory", "guidance", "research", "diagnostics", "specialist"]):
+        return (23, 26)
+    if any(keyword in normalized for keyword in ["engineering", "analysis", "technology", "digital", "technical"]):
+        return (21, 24)
+    return (20, 23)
+
+
+def _profession_role_examples(source_planets: list[str], profession_signature: str) -> str:
+    role_map = {
+        "Sun": ["administration", "leadership-track work", "public-facing responsibility"],
+        "Moon": ["teaching support", "care-oriented work", "education-facing roles"],
+        "Mars": ["engineering", "operations", "technical execution"],
+        "Mercury": ["software", "analytics", "communication-heavy work"],
+        "Jupiter": ["teaching", "advisory work", "knowledge-led guidance"],
+        "Venus": ["design", "media", "presentation-oriented roles"],
+        "Saturn": ["systems work", "compliance", "structured administration"],
+        "Rahu": ["digital platforms", "modern technology", "foreign-linked industries"],
+        "Ketu": ["research", "diagnostics", "specialist back-end work"],
+    }
+    roles: list[str] = []
+    for planet in source_planets:
+        roles.extend(role_map.get(planet, []))
+
+    if not roles:
+        normalized = profession_signature.lower()
+        if "technology" in normalized or "digital" in normalized:
+            roles = ["software", "analytics", "technical platforms"]
+        elif "design" in normalized or "creative" in normalized:
+            roles = ["design", "content", "presentation-oriented work"]
+        else:
+            roles = ["knowledge-based work", "structured service roles", "professional support work"]
+
+    unique_roles: list[str] = []
+    for role in roles:
+        if role not in unique_roles:
+            unique_roles.append(role)
+    return ", ".join(unique_roles[:3])
+
+
+def _age_year_window(date_of_birth: str, start_age: int, end_age: int) -> str:
+    birth = date.fromisoformat(date_of_birth)
+    start_year = birth.year + start_age
+    end_year = birth.year + end_age
+    return f"{start_year}-{end_year}"
+
+
+def _timeline_window_for_age_band(
+    timeline: list[DashaTimelineEntry],
+    start_age: int,
+    end_age: int,
+) -> str:
+    matching = [
+        entry
+        for entry in timeline
+        if not (entry.end_age < start_age or entry.start_age > end_age)
+    ]
+    if not matching:
+        return "The lifetime dasha ladder should be checked again near that age band for exact entry timing."
+
+    rulers = ", ".join(dict.fromkeys(entry.ruler for entry in matching[:2]))
+    return f"That future profession-entry band falls mainly under {rulers} maha-dasha influence in the current computed lifetime ladder."
 
 
 def _assess_period_ruler(
