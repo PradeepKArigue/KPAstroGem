@@ -299,6 +299,13 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
                 <SessionBadge label="Relevant houses" value={answer.relevantHouses.join(", ")} />
               </div>
 
+              <div className="mt-6 grid gap-4 xl:grid-cols-2">
+                <AnswerFocusCard title="Direct Answer" detail={answer.answerSummary.directAnswer} />
+                <AnswerFocusCard title="Best Timing" detail={answer.answerSummary.bestTiming} />
+                <AnswerFocusCard title="What This Means" detail={answer.answerSummary.practicalMeaning} />
+                <AnswerFocusCard title="Why KP Says This" detail={answer.answerSummary.kpReason} />
+              </div>
+
               <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
                 <div className="rounded-[28px] bg-slate-50 p-5">
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aurora/80">Plain-language reading</p>
@@ -449,6 +456,15 @@ function AnswerList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function AnswerFocusCard({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5">
+      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aurora/80">{title}</p>
+      <p className="mt-3 text-sm leading-7 text-midnight/75">{detail}</p>
+    </div>
+  );
+}
+
 function buildSuggestedPrompts(topics: QuestionTopic[]): SuggestedPrompt[] {
   return topics.slice(0, 6).flatMap((topic) =>
     topic.sampleQuestions.slice(0, 1).map((sample) => ({
@@ -470,17 +486,17 @@ function buildInsightLines(dashaSummary: ChartSessionResponse["chartData"]["dash
 
 function buildPriorityHighlights(answer: ChartQuestionResponse) {
   return [
-    `Primary timing window: ${answer.possibleTimingWindow}.`,
-    answer.plainExplanation,
+    answer.answerSummary.directAnswer,
+    answer.answerSummary.bestTiming,
+    answer.answerSummary.practicalMeaning,
     answer.supportingFactors[0] ?? "Supporting factors are still being assembled for this answer.",
-    answer.blockingFactors[0] ?? "Blocking factors are currently limited in the generated reading.",
   ];
 }
 
 function pickAnswerLead(answer: ChartQuestionResponse) {
-  return answer.plainExplanation || answer.interpretation[3] || answer.interpretation[1] || answer.interpretation[0] || "Answer summary unavailable.";
+  return answer.answerSummary.directAnswer || answer.plainExplanation || answer.interpretation[3] || answer.interpretation[1] || answer.interpretation[0] || "Answer summary unavailable.";
 }
 
 function pickHistoryPreview(item: ChartQuestionResponse) {
-  return item.plainExplanation || item.interpretation[3] || item.interpretation[1] || item.interpretation[0] || "Answer summary unavailable.";
+  return item.answerSummary.directAnswer || item.plainExplanation || item.interpretation[3] || item.interpretation[1] || item.interpretation[0] || "Answer summary unavailable.";
 }

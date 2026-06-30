@@ -122,6 +122,15 @@ class CalculationTrailEntry(BaseModel):
     detail: str
 
 
+class CustomerAnswerSummary(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    direct_answer: str = Field(..., alias="directAnswer")
+    best_timing: str = Field(..., alias="bestTiming")
+    practical_meaning: str = Field(..., alias="practicalMeaning")
+    kp_reason: str = Field(..., alias="kpReason")
+
+
 class ChartData(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -172,6 +181,7 @@ class ChartQuestionResponse(BaseModel):
 
     question: str
     classified_topic: str = Field(..., alias="classifiedTopic")
+    answer_summary: CustomerAnswerSummary = Field(..., alias="answerSummary")
     plain_explanation: str = Field(..., alias="plainExplanation")
     relevant_houses: list[int] = Field(..., alias="relevantHouses")
     cusp_sub_lord_analysis: list[str] = Field(..., alias="cuspSubLordAnalysis")

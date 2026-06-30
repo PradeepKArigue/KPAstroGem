@@ -15,6 +15,7 @@ from app.schemas.chart import (
     ChartData,
     ChartQuestionResponse,
     ConfidenceLevel,
+    CustomerAnswerSummary,
     DashaPeriod,
     DashaTimelineEntry,
     HouseCusp,
@@ -568,6 +569,17 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         age_context=age_context,
         minor_projection=minor_projection,
     )
+    answer_summary = _build_customer_answer_summary(
+        chart=chart,
+        topic_name=topic.name,
+        trend=trend,
+        timing_window=optional_date_range or chart.dasha_summary.window,
+        current_age=current_age,
+        dominant_cusp=dominant_cusp,
+        profession_signature=profession_signature,
+        age_context=age_context,
+        evaluation=evaluation,
+    )
 
     caution_disclaimer = (
         "This response is an automated KP-style interpretation and should be treated as decision support, not certainty."
@@ -666,6 +678,7 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
     return ChartQuestionResponse(
         question=question,
         classifiedTopic=topic.name,
+        answerSummary=answer_summary,
         plainExplanation=plain_explanation,
         relevantHouses=topic.house_focus,
         cuspSubLordAnalysis=cusp_sub_lord_analysis,
@@ -679,6 +692,98 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         calculationTrail=calculation_trail,
         disclaimer=caution_disclaimer,
     )
+
+
+def _build_customer_answer_summary(
+    *,
+    chart: ChartData,
+    topic_name: str,
+    trend: str,
+    timing_window: str,
+    current_age: int,
+    dominant_cusp: HouseCusp,
+    profession_signature: str,
+    age_context: dict[str, str | bool],
+    evaluation: TopicEvaluation,
+) -> CustomerAnswerSummary:
+    direct_answer = _build_direct_answer(topic_name, trend, current_age)
+    best_timing = _build_best_timing_line(topic_name, timing_window, current_age, profession_signature)
+    practical_meaning = _build_practical_meaning(topic_name, trend, current_age, profession_signature)
+    kp_reason = (
+        f"KP checked houses {', '.join(str(h) for h in TOPIC_CONTEXT.get(topic_name, TOPIC_CONTEXT['Career'])['supporting'])}, "
+        f"the cusp chain {dominant_cusp.sign_lord}/{dominant_cusp.star_lord}/{dominant_cusp.sub_lord}, and the active dasha "
+        f"{chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / {chart.dasha_summary.antara}. "
+        f"The current rule reading is {evaluation.trend} with support score {evaluation.support_score} and challenge score {evaluation.challenge_score}."
+    )
+    return CustomerAnswerSummary(
+        directAnswer=direct_answer,
+        bestTiming=best_timing,
+        practicalMeaning=practical_meaning,
+        kpReason=kp_reason,
+    )
+
+
+def _build_direct_answer(topic_name: str, trend: str, current_age: int) -> str:
+    if current_age < 18 and topic_name == "Career":
+        if trend == "supportive":
+            return "Short answer: the chart supports future job growth, but this is still a preparation phase rather than current job timing."
+        if trend == "challenging":
+            return "Short answer: the chart shows future job potential, but not an easy or immediate path; growth may come with delay and extra effort."
+        return "Short answer: the chart supports future job possibility, but the path looks mixed, so progress may come with delay or stop-start movement."
+    if current_age < 18 and topic_name == "Education":
+        return "Short answer: the chart is favorable for education growth, but the present years should be judged for learning pattern and stream direction rather than final career outcome."
+    if current_age < 18 and topic_name == "Health Caution":
+        return "Short answer: the chart does not show a severe signal right now, but it does suggest steady care, monitoring, and routine awareness."
+    if current_age < 18:
+        if trend == "supportive":
+            return f"Short answer: the chart is supportive for this area later in life, but because the native is still young it should be read through future development rather than immediate adult results."
+        if trend == "challenging":
+            return f"Short answer: the chart shows this area may need more patience later, and it should not be judged as an immediate adult result while the native is still young."
+        return f"Short answer: the chart shows potential in this area later, but the result is mixed and should be judged more carefully with maturity and timing."
+    if trend == "supportive":
+        return "Short answer: yes, the chart is supportive overall."
+    if trend == "challenging":
+        return "Short answer: the chart shows possibility, but with caution, delay, or extra effort."
+    return "Short answer: the chart shows possibility, but the result is mixed rather than fully straightforward."
+
+
+def _build_best_timing_line(topic_name: str, timing_window: str, current_age: int, profession_signature: str) -> str:
+    if current_age < 18 and topic_name == "Career":
+        entry_start_age, entry_end_age = _profession_entry_age_band(profession_signature)
+        return (
+            f"Best timing: the current active window is {timing_window}, but for literal job results the stronger profession-entry years are around age "
+            f"{entry_start_age} to {entry_end_age}."
+        )
+    maturity_start_age, maturity_end_age = _minor_topic_maturity_window(topic_name)
+    if current_age < 18 and topic_name not in {"Career", "Education"}:
+        return (
+            f"Best timing: the current active window is {timing_window}, but the more literal years for this topic are around age "
+            f"{maturity_start_age} to {maturity_end_age}."
+        )
+    return f"Best timing: the strongest active window in this reading is {timing_window}."
+
+
+def _build_practical_meaning(topic_name: str, trend: str, current_age: int, profession_signature: str) -> str:
+    if current_age < 18 and topic_name == "Career":
+        return (
+            f"What this means: focus now on study, skill-building, and stream direction. The chart currently leans toward {profession_signature}, "
+            "so the present period should be used to notice strengths and prepare for later professional entry."
+        )
+    if current_age < 18 and topic_name == "Education":
+        return "What this means: use the present years to build confidence, discipline, and subject clarity, because those are the strongest signals available at this stage."
+    if current_age < 18 and topic_name == "Health Caution":
+        return "What this means: maintain routine, observation, and timely care; the chart is more useful here for guidance and caution than for fear."
+    if current_age < 18:
+        if trend == "supportive":
+            return "What this means: the future pattern looks supportive, but current years should be used to build maturity, habits, and context rather than expect literal adult outcomes."
+        if trend == "challenging":
+            return "What this means: this area may need patience and maturity later, so present years should focus on strengthening habits and judgment."
+        return "What this means: the future pattern is possible but not simple, so present years should be used for preparation rather than certainty."
+    if trend == "supportive":
+        return "What this means: this is a workable period, and practical effort during the active window can help results materialize."
+    if trend == "challenging":
+        return "What this means: proceed with effort and caution because delays or complications are still active in the chart."
+    return "What this means: the chart gives both support and caution, so steady effort and timing awareness matter more than a single yes-or-no conclusion."
 
 
 def _infer_topic(question: str, fallback: str) -> QuestionTopic:

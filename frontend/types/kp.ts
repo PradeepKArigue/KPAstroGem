@@ -145,6 +145,13 @@ export type CalculationTrailEntry = {
   detail: string;
 };
 
+export type CustomerAnswerSummary = {
+  directAnswer: string;
+  bestTiming: string;
+  practicalMeaning: string;
+  kpReason: string;
+};
+
 export type ChartData = {
   birthSummary: BirthSummary;
   planetaryPositions: PlanetaryPosition[];
@@ -176,6 +183,7 @@ export type ChartQuestionRequest = {
 export type ChartQuestionResponse = {
   question: string;
   classifiedTopic: string;
+  answerSummary: CustomerAnswerSummary;
   plainExplanation: string;
   relevantHouses: number[];
   cuspSubLordAnalysis: string[];
