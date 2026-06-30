@@ -285,17 +285,34 @@ export function ReportView({ chartId }: { chartId: string }) {
           />
         </TableCard>
 
-        <TableCard title="Question Session Ledger">
+        <TableCard title="Question Session Summary">
           {questionHistory.length > 0 ? (
-            <DenseTable
-              headers={["Question", "Topic", "Timing", "Confidence"]}
-              rows={questionHistory.map((item) => [
-                item.question,
-                item.classifiedTopic,
-                item.possibleTimingWindow,
-                `${item.confidenceLevel.level} - ${item.confidenceLevel.reason}`,
-              ])}
-            />
+            <div className="space-y-4">
+              {questionHistory.map((item, index) => (
+                <div key={`${item.question}-${index}`} className="rounded-3xl bg-slate-50 p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-aurora/80">Question</p>
+                      <p className="mt-2 font-semibold leading-7 text-midnight">{item.question}</p>
+                    </div>
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-midnight/60">
+                      {item.classifiedTopic}
+                    </span>
+                  </div>
+                  <div className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm leading-7 text-midnight/70">
+                    {item.plainExplanation}
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl bg-white px-4 py-3 text-sm text-midnight/70">
+                      <span className="font-semibold text-midnight">Timing window:</span> {item.possibleTimingWindow}
+                    </div>
+                    <div className="rounded-2xl bg-white px-4 py-3 text-sm text-midnight/70">
+                      <span className="font-semibold text-midnight">Confidence:</span> {item.confidenceLevel.level}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-midnight/70">
               No questions have been asked yet for this chart session.
