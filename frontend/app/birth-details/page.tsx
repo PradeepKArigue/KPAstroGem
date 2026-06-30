@@ -7,12 +7,12 @@ export default function BirthDetailsPage() {
         <section className="glass-panel bg-orbital-grid p-8 sm:p-10">
           <p className="section-title">Birth Session Setup</p>
           <h1 className="mt-3 font-[family-name:var(--font-heading)] text-5xl font-semibold text-midnight">
-            Capture birth details without creating an account
+            Start a chart with precise birth, place, and timezone details
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-7 text-midnight/75">
-            This phase introduces the chart-session model from your larger product prompt. The form now
-            collects timezone, state, and optional manual coordinates so the backend can return a
-            short-lived chart ID and a more scalable placeholder KP structure.
+            Enter the birth identity once, confirm the resolved location, and continue into a reusable
+            chart session. The app uses city search, state and country context, timezone resolution, and
+            optional manual coordinate overrides when you need tighter control.
           </p>
         </section>
 

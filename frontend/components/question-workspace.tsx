@@ -9,7 +9,7 @@ import type { ChartQuestionResponse, ChartSessionResponse, QuestionTopic } from 
 export function QuestionWorkspace({ chartId }: { chartId: string }) {
   const [session, setSession] = useState<ChartSessionResponse | null>(null);
   const [topics, setTopics] = useState<QuestionTopic[]>([]);
-  const [question, setQuestion] = useState("How is my career growth?");
+  const [question, setQuestion] = useState("");
   const [dateRange, setDateRange] = useState("");
   const [answer, setAnswer] = useState<ChartQuestionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -108,8 +108,8 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
               Question workspace for {session.chartData.birthSummary.name}
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-midnight/70">
-              This flow uses a temporary chart session, mapped topic houses, placeholder cusp-sub-lord analysis,
-              and a structured disclaimer model.
+              This flow keeps the chart context, mapped topic houses, question history, and interpretation notes
+              together so the reading feels consistent from one question to the next.
             </p>
           </div>
           <Link href={`/dashboard/${chartId}`} className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-midnight transition hover:border-aurora hover:text-aurora">
@@ -196,7 +196,7 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
             disabled={isSubmitting}
             className="mt-6 inline-flex items-center justify-center rounded-full bg-midnight px-6 py-3 text-sm font-semibold text-white transition hover:bg-aurora disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {isSubmitting ? "Asking placeholder KP engine..." : "Ask Question"}
+            {isSubmitting ? "Analyzing chart context..." : "Ask Question"}
           </button>
         </form>
 

@@ -43,12 +43,14 @@ def search_locations(query: str, state: str | None = None, country: str | None =
     normalized_query = query.strip()
     if not normalized_query:
         return []
+    normalized_state = state.strip() if state and state.strip() else None
+    normalized_country = country.strip() if country and country.strip() else None
 
     query_parts = [normalized_query]
-    if state and state.strip():
-        query_parts.append(state.strip())
-    if country and country.strip():
-        query_parts.append(country.strip())
+    if normalized_state:
+        query_parts.append(normalized_state)
+    if normalized_country:
+        query_parts.append(normalized_country)
 
     params = urlencode(
         {
@@ -69,7 +71,30 @@ def search_locations(query: str, state: str | None = None, country: str | None =
     with urlopen(request, timeout=10) as response:
         payload = loads(response.read().decode("utf-8"))
 
-    return [_to_location_candidate(item, normalized_query) for item in payload]
+    candidates = [
+        _to_location_candidate(
+            item,
+            query=normalized_query,
+            requested_state=normalized_state,
+            requested_country=normalized_country,
+        )
+        for item in payload
+    ]
+    deduplicated: list[LocationCandidate] = []
+    seen_keys: set[tuple[str, str | None, str | None]] = set()
+
+    for candidate in sorted(candidates, key=lambda item: item.confidence, reverse=True):
+        key = (
+            candidate.city.casefold(),
+            candidate.state_or_province.casefold() if candidate.state_or_province else None,
+            candidate.country.casefold() if candidate.country else None,
+        )
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        deduplicated.append(candidate)
+
+    return deduplicated[:5]
 
 
 def resolve_timezone(latitude: float, longitude: float) -> str | None:
@@ -148,7 +173,7 @@ def validate_location(
         confidence -= 0.05
 
     warnings.append(
-        f"Birth details were normalized for {birth_place}, {country} using timezone {timezone}. Historical DST edge cases are not fully audited in this MVP."
+        f"Birth details were normalized for {birth_place}, {country} using timezone {timezone}. Historical DST edge cases are not fully audited in this version."
     )
 
     return ValidatedLocation(
@@ -158,7 +183,13 @@ def validate_location(
     )
 
 
-def _to_location_candidate(item: dict[str, Any], query: str) -> LocationCandidate:
+def _to_location_candidate(
+    item: dict[str, Any],
+    *,
+    query: str,
+    requested_state: str | None,
+    requested_country: str | None,
+) -> LocationCandidate:
     address = item.get("address", {})
     city = str(
         address.get("city")
@@ -180,6 +211,8 @@ def _to_location_candidate(item: dict[str, Any], query: str) -> LocationCandidat
         state_or_province=state_or_province,
         country=country,
         timezone=timezone,
+        requested_state=requested_state,
+        requested_country=requested_country,
     )
 
     return LocationCandidate(
@@ -201,14 +234,22 @@ def _estimate_confidence(
     state_or_province: str | None,
     country: str | None,
     timezone: str | None,
+    requested_state: str | None,
+    requested_country: str | None,
 ) -> float:
     score = 0.58
     if city.casefold() == query.casefold():
         score += 0.18
+    elif city.casefold().startswith(query.casefold()):
+        score += 0.1
     if state_or_province:
         score += 0.1
+    if requested_state and state_or_province and state_or_province.casefold() == requested_state.casefold():
+        score += 0.07
     if country:
         score += 0.08
+    if requested_country and country and country.casefold() == requested_country.casefold():
+        score += 0.07
     if timezone:
         score += 0.08
 

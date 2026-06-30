@@ -99,7 +99,7 @@ export function ReportView({ chartId }: { chartId: string }) {
         <p className="mt-5 max-w-4xl text-base leading-7 text-midnight/75">
           This report now includes chart identity, Rasi and Jathakam details, planet and cusp tables,
           derived significator logic, and a date-based dasha reading layer. The current output is still
-          clearly marked as modeled until the full KP calculation engine is integrated.
+          clearly marked as modeled until a fully verified KP calculation engine is integrated.
         </p>
         <div className="mt-6 flex flex-wrap gap-3 print:hidden">
           <button
@@ -326,7 +326,7 @@ function buildChartOrientationRows(birthSummary: BirthSummary, houseCusps: House
   const tenthHouse = houseCusps.find((cusp) => cusp.house === 10);
 
   return [
-    ["Ayanamsa mode", "KP New (modeled MVP)"],
+    ["Ayanamsa mode", "KP New (modeled)"],
     ["Ascendant cue", firstHouse ? `${firstHouse.sign} ${firstHouse.cuspDegree}` : "Pending"],
     ["Moon-sign cue", moonHouse ? `${moonHouse.sign} ${moonHouse.cuspDegree}` : "Pending"],
     ["Career cusp cue", tenthHouse ? `${tenthHouse.sign} ${tenthHouse.cuspDegree}` : "Pending"],
@@ -345,7 +345,7 @@ function buildRasiAndJathakamRows(
   const careerCusp = cusps.find((cusp) => cusp.house === 10) ?? cusps[9] ?? cusps[0];
 
   return [
-    ["Ayanamsa", "KP New (modeled MVP)"],
+    ["Ayanamsa", "KP New (modeled)"],
     ["Lagna / Ascendant", `${lagna.sign} ${lagna.cuspDegree}`],
     ["Lagna lord", lagna.signLord],
     ["Janma rasi", moon.sign],
@@ -581,8 +581,11 @@ function DenseTable({ headers, rows }: { headers: string[]; rows: string[][] }) 
       <table className="min-w-full border-separate border-spacing-0 overflow-hidden rounded-3xl border border-slate-200 bg-white text-left text-sm text-midnight/75">
         <thead>
           <tr className="bg-slate-50">
-            {headers.map((header) => (
-              <th key={header} className="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-aurora/80">
+            {headers.map((header, index) => (
+              <th
+                key={`${header}-${index}`}
+                className="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-aurora/80"
+              >
                 {header}
               </th>
             ))}
@@ -592,7 +595,10 @@ function DenseTable({ headers, rows }: { headers: string[]; rows: string[][] }) 
           {rows.map((row, index) => (
             <tr key={`${row[0]}-${index}`} className="align-top">
               {row.map((cell, cellIndex) => (
-                <td key={`${headers[cellIndex]}-${cellIndex}`} className="border-b border-slate-100 px-4 py-3 leading-6 last:border-b-0">
+                <td
+                  key={`${row[0]}-${cellIndex}-${index}`}
+                  className="border-b border-slate-100 px-4 py-3 leading-6 last:border-b-0"
+                >
                   {cell}
                 </td>
               ))}

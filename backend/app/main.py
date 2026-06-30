@@ -8,7 +8,7 @@ from app.core.config import settings
 app = FastAPI(
     title="KPAstroGem API",
     version="0.2.0",
-    description="FastAPI backend for the KPAstroGem chart-session MVP.",
+    description="FastAPI backend for KPAstroGem chart sessions, reports, and guided KP question workflows.",
 )
 
 app.add_middleware(

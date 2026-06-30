@@ -22,6 +22,49 @@ const questionCategories = [
   "Legal Caution",
 ];
 
+const suggestedQuestionsByCategory: Record<string, string[]> = {
+  Career: [
+    "What does the chart show about my current career direction?",
+    "Is this a favorable period for a job change or promotion?",
+  ],
+  Marriage: [
+    "What does the chart indicate about marriage timing and stability?",
+    "Is this a supportive period for relationship commitment?",
+  ],
+  Finance: [
+    "How does the chart describe my present financial trend?",
+    "Is this period supportive for improving savings and income stability?",
+  ],
+  "Foreign Settlement": [
+    "Does the chart support foreign travel or settlement in the near term?",
+    "What are the chart signals for relocation abroad?",
+  ],
+  Property: [
+    "Is this a supportive time for buying property or land?",
+    "What does the chart show about home and asset stability?",
+  ],
+  Children: [
+    "What does the chart indicate regarding children and family growth?",
+    "Is the current period supportive for child-related matters?",
+  ],
+  Business: [
+    "Does the chart support business expansion or a new venture now?",
+    "What are the strengths and caution areas for business decisions?",
+  ],
+  Education: [
+    "What does the chart show about higher studies and learning progress?",
+    "Is this period favorable for exams or academic advancement?",
+  ],
+  "Health Caution": [
+    "What health caution areas are visible in the current period?",
+    "Which habits need more attention according to the chart trend?",
+  ],
+  "Legal Caution": [
+    "Does the chart show caution around legal or compliance matters?",
+    "How should I read the current period for disputes or documentation?",
+  ],
+};
+
 const initialForm: ChartCalculationRequest = {
   name: "",
   dateOfBirth: "",
@@ -35,7 +78,7 @@ const initialForm: ChartCalculationRequest = {
   manualTimezoneOverride: "",
   manualCoordinateOverride: false,
   questionCategory: "Career",
-  question: "How is my career growth?",
+  question: "",
 };
 
 export function BirthForm() {
@@ -47,6 +90,21 @@ export function BirthForm() {
   const [isResolvingPlace, setIsResolvingPlace] = useState(false);
   const [placeLookupMessage, setPlaceLookupMessage] = useState<string | null>(null);
   const [hasSelectedSuggestion, setHasSelectedSuggestion] = useState(false);
+  const stateSuggestions = Array.from(
+    new Set(
+      locationSuggestions
+        .map((suggestion) => suggestion.stateOrProvince?.trim())
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const countrySuggestions = Array.from(
+    new Set(
+      locationSuggestions
+        .map((suggestion) => suggestion.country?.trim())
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const sampleQuestions = suggestedQuestionsByCategory[formData.questionCategory] ?? [];
 
   const updateField = <T extends keyof ChartCalculationRequest>(field: T, value: ChartCalculationRequest[T]) => {
     setFormData((current) => ({ ...current, [field]: value }));
@@ -80,6 +138,11 @@ export function BirthForm() {
         setLocationSuggestions(suggestions);
         if (suggestions.length === 0) {
           setPlaceLookupMessage("No matching places were found yet. Try adding a state or country.");
+        } else if (suggestions.length === 1) {
+          const [match] = suggestions;
+          setPlaceLookupMessage(
+            `One strong place match found for ${match.displayName}. Select it to confirm coordinates and timezone.`,
+          );
         } else if (suggestions.length > 1) {
           setPlaceLookupMessage("Multiple location matches were found. Please choose the best one before continuing.");
         }
@@ -162,6 +225,17 @@ export function BirthForm() {
     }));
   };
 
+  const handleLocationContextChange = (field: "state" | "country", value: string) => {
+    setHasSelectedSuggestion(false);
+    setFormData((current) => ({
+      ...current,
+      [field]: value,
+      latitude: current.manualCoordinateOverride ? current.latitude : undefined,
+      longitude: current.manualCoordinateOverride ? current.longitude : undefined,
+      timezone: current.manualCoordinateOverride ? current.timezone : "",
+    }));
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
@@ -214,7 +288,7 @@ export function BirthForm() {
             className={inputClass}
             value={formData.name}
             onChange={(event) => updateField("name", event.target.value)}
-            placeholder="Enter the chart owner's name"
+            placeholder="Enter the native's full name"
           />
         </Field>
         <Field label="Question category">
@@ -242,7 +316,7 @@ export function BirthForm() {
               className={inputClass}
               value={formData.birthPlace}
               onChange={(event) => handleBirthPlaceChange(event.target.value)}
-              placeholder="Start typing a city, town, or locality"
+              placeholder="Type at least 2 letters of a city, town, or locality"
             />
             {!formData.manualCoordinateOverride && (isResolvingPlace || locationSuggestions.length > 0 || placeLookupMessage) ? (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
@@ -271,20 +345,64 @@ export function BirthForm() {
           </div>
         </Field>
         <Field label="State or province">
-          <input
-            className={inputClass}
-            value={formData.state ?? ""}
-            onChange={(event) => updateField("state", event.target.value)}
-            placeholder="Optional, but helps narrow the location"
-          />
+          <div className="space-y-3">
+            <input
+              list="state-suggestion-list"
+              className={inputClass}
+              value={formData.state ?? ""}
+              onChange={(event) => handleLocationContextChange("state", event.target.value)}
+              placeholder="Start typing the state to refine city matches"
+            />
+            <datalist id="state-suggestion-list">
+              {stateSuggestions.map((state) => (
+                <option key={state} value={state} />
+              ))}
+            </datalist>
+            {stateSuggestions.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {stateSuggestions.slice(0, 6).map((state) => (
+                  <button
+                    key={state}
+                    type="button"
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-midnight/70 transition hover:border-aurora hover:text-aurora"
+                    onClick={() => handleLocationContextChange("state", state)}
+                  >
+                    {state}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </Field>
         <Field label="Country">
-          <input
-            className={inputClass}
-            value={formData.country}
-            onChange={(event) => updateField("country", event.target.value)}
-            placeholder="Country"
-          />
+          <div className="space-y-3">
+            <input
+              list="country-suggestion-list"
+              className={inputClass}
+              value={formData.country}
+              onChange={(event) => handleLocationContextChange("country", event.target.value)}
+              placeholder="Country"
+            />
+            <datalist id="country-suggestion-list">
+              {countrySuggestions.map((country) => (
+                <option key={country} value={country} />
+              ))}
+            </datalist>
+            {countrySuggestions.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {countrySuggestions.slice(0, 6).map((country) => (
+                  <button
+                    key={country}
+                    type="button"
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-midnight/70 transition hover:border-aurora hover:text-aurora"
+                    onClick={() => handleLocationContextChange("country", country)}
+                  >
+                    {country}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </Field>
         <Field label="Timezone">
           <input
@@ -342,8 +460,22 @@ export function BirthForm() {
           className="min-h-32 w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-aurora focus:ring-4 focus:ring-aurora/10"
           value={formData.question}
           onChange={(event) => updateField("question", event.target.value)}
-          placeholder="Ask a focused KP question..."
+          placeholder="Ask a focused KP question about the selected category..."
         />
+        {sampleQuestions.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {sampleQuestions.map((question) => (
+              <button
+                key={question}
+                type="button"
+                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-midnight/70 transition hover:border-aurora hover:text-aurora"
+                onClick={() => updateField("question", question)}
+              >
+                {question}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </label>
 
       {errorMessage ? (
@@ -361,7 +493,7 @@ export function BirthForm() {
           {isSubmitting ? "Preparing location confirmation..." : "Continue to Location Confirmation"}
         </button>
         <p className="text-sm text-midnight/60">
-          Temporary chart sessions expire automatically and are not exposed in public birth-data URLs.
+          Chart sessions expire automatically and private birth details are not exposed in public URLs.
         </p>
       </div>
     </form>

@@ -18,8 +18,8 @@ const headingFont = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "KPAstroGem MVP",
-  description: "Local-first KP astrology MVP built with Next.js and FastAPI.",
+  title: "KPAstroGem",
+  description: "Professional KP astrology chart sessions, structured reports, and guided question workflows.",
 };
 
 export default function RootLayout({

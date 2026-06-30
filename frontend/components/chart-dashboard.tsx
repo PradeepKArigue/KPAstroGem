@@ -45,7 +45,7 @@ export function ChartDashboard({ chartId }: { chartId: string }) {
   }, [chartId]);
 
   if (isLoading) {
-    return <LoadingPanel label="Loading temporary chart session..." />;
+    return <LoadingPanel label="Loading chart session..." />;
   }
 
   if (errorMessage || !session) {
@@ -77,7 +77,7 @@ export function ChartDashboard({ chartId }: { chartId: string }) {
           <div>
             <p className="section-title">Chart Dashboard</p>
             <h1 className="mt-3 font-[family-name:var(--font-heading)] text-4xl font-semibold text-midnight">
-              {chartData.birthSummary.name}&apos;s temporary KP chart
+              {chartData.birthSummary.name}&apos;s KP chart
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-midnight/70">
               {chartData.birthSummary.summaryLine}
@@ -149,7 +149,7 @@ export function ChartDashboard({ chartId }: { chartId: string }) {
         <div className="glass-panel p-6 sm:p-8">
           <p className="section-title">Current Dasha View</p>
           <h2 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold text-midnight">
-            Placeholder timing panel
+            Current timing panel
           </h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <SummaryBadge label="Maha dasha" value={chartData.dashaSummary.mahaDasha} />
@@ -216,7 +216,7 @@ export function ChartDashboard({ chartId }: { chartId: string }) {
         <div className="glass-panel p-6 sm:p-8">
           <p className="section-title">Interpretation Layer</p>
           <h2 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold text-midnight">
-            Structured placeholder KP output
+            Structured KP reading
           </h2>
           <ul className="mt-5 space-y-3">
             {chartData.interpretation.map((item) => (
