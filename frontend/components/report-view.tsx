@@ -8,6 +8,7 @@ import type {
   BirthSummary,
   ChartQuestionResponse,
   ChartSessionResponse,
+  DashaTimelineEntry,
   DashaSummary,
   HouseCusp,
   PlanetaryPosition,
@@ -95,6 +96,8 @@ export function ReportView({ chartId }: { chartId: string }) {
   const chartOrientationRows = buildChartOrientationRows(chartData.birthSummary, chartData.planetaryPositions, chartData.houseCusps);
   const rasiRows = buildRasiAndJathakamRows(chartData.birthSummary, chartData.planetaryPositions, chartData.houseCusps);
   const dashaRows = buildDashaRows(chartData.dashaSummary);
+  const birthDashaRows = buildBirthDashaRows(chartData);
+  const lifetimeDashaRows = buildLifetimeDashaRows(chartData.lifetimeDashaTimeline);
   const dashaNarrative = buildCurrentDashaNarrative(
     chartData.birthSummary,
     chartData.planetaryPositions,
@@ -181,6 +184,23 @@ export function ReportView({ chartId }: { chartId: string }) {
                 {item}
               </div>
             ))}
+          </div>
+        </TableCard>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr] print:grid-cols-1">
+        <TableCard title="Birth Dasha Snapshot">
+          <DenseTable headers={["Field", "Value"]} rows={birthDashaRows} />
+          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-7 text-midnight/70">
+            {chartData.birthDasha.note}
+          </div>
+        </TableCard>
+
+        <TableCard title="KP Strengths, Cautions, and Remedies">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <ReportListCard title="Strengths" items={chartData.kpStrengths} />
+            <ReportListCard title="Cautions" items={chartData.kpCautions} />
+            <ReportListCard title="Remedies" items={chartData.remedies} />
           </div>
         </TableCard>
       </section>
@@ -285,6 +305,15 @@ export function ReportView({ chartId }: { chartId: string }) {
           />
         </TableCard>
 
+        <TableCard title="Lifetime Maha Dasha Timeline">
+          <DenseTable
+            headers={["Ruler", "From", "To", "Age Span", "Quality", "Focus"]}
+            rows={lifetimeDashaRows}
+          />
+        </TableCard>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2 print:grid-cols-1">
         <TableCard title="Question Session Summary">
           {questionHistory.length > 0 ? (
             <div className="space-y-4">
@@ -318,6 +347,32 @@ export function ReportView({ chartId }: { chartId: string }) {
               No questions have been asked yet for this chart session.
             </div>
           )}
+        </TableCard>
+
+        <TableCard title="Dasha Period Guidance">
+          <div className="space-y-4">
+            {chartData.lifetimeDashaTimeline.slice(0, 6).map((entry) => (
+              <div key={`${entry.ruler}-${entry.startDate}`} className="rounded-3xl bg-slate-50 p-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-aurora/80">{entry.level}</p>
+                    <p className="mt-2 font-semibold text-midnight">
+                      {entry.ruler} | Age {entry.startAge.toFixed(1)} to {entry.endAge.toFixed(1)}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-midnight/60">
+                    {entry.quality}
+                  </span>
+                </div>
+                <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm leading-7 text-midnight/70">{entry.focus}</p>
+                <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                  <ReportListCard title="Good" items={entry.goodIndicators} compact />
+                  <ReportListCard title="Bad / Watch" items={entry.cautionIndicators} compact />
+                  <ReportListCard title="Remedies" items={entry.remedies} compact />
+                </div>
+              </div>
+            ))}
+          </div>
         </TableCard>
       </section>
 
@@ -532,6 +587,26 @@ function buildDashaRows(dashaSummary: DashaSummary): DashaPeriodRow[] {
   ];
 }
 
+function buildBirthDashaRows(chartData: ChartSessionResponse["chartData"]): string[][] {
+  return [
+    ["Birth Maha Dasha", chartData.birthDasha.mahaDasha],
+    ["Birth Bhukti", chartData.birthDasha.bhukti],
+    ["Birth Antara", chartData.birthDasha.antara],
+    ["Balance At Birth", chartData.birthDasha.balanceAtBirth],
+  ];
+}
+
+function buildLifetimeDashaRows(entries: DashaTimelineEntry[]): string[][] {
+  return entries.map((entry) => [
+    entry.ruler,
+    entry.startDate,
+    entry.endDate,
+    `${entry.startAge.toFixed(1)} - ${entry.endAge.toFixed(1)}`,
+    entry.quality,
+    entry.focus,
+  ]);
+}
+
 function getWeekWindow(date: Date) {
   const start = new Date(date);
   const day = (start.getDay() + 6) % 7;
@@ -649,6 +724,21 @@ function LegendItem({ code, text }: { code: string; text: string }) {
   return (
     <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-midnight/70">
       <span className="font-semibold text-midnight">{code}</span> - {text}
+    </div>
+  );
+}
+
+function ReportListCard({ title, items, compact = false }: { title: string; items: string[]; compact?: boolean }) {
+  return (
+    <div className={`rounded-3xl bg-slate-50 ${compact ? "p-4" : "p-5"}`}>
+      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aurora/80">{title}</p>
+      <ul className="mt-4 space-y-2">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="rounded-2xl bg-white px-4 py-3 text-sm leading-7 text-midnight/70">
+            {item}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

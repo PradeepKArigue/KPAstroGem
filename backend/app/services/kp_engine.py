@@ -9,12 +9,14 @@ import swisseph as swe
 
 from app.schemas.chart import (
     BirthSummary,
+    BirthDashaSnapshot,
     CalculationTrailEntry,
     ChartCalculationRequest,
     ChartData,
     ChartQuestionResponse,
     ConfidenceLevel,
     DashaPeriod,
+    DashaTimelineEntry,
     HouseCusp,
     PlanetaryPosition,
     QuestionTopic,
@@ -110,6 +112,22 @@ HOUSE_SYSTEM = b"P"
 NAKSHATRA_SPAN = 360 / 27
 PADA_SPAN = NAKSHATRA_SPAN / 4
 DASHA_YEAR_DAYS = 365.2425
+GENERAL_SUPPORTIVE_HOUSES = {1, 2, 4, 5, 7, 9, 10, 11}
+GENERAL_CHALLENGING_HOUSES = {6, 8, 12}
+HOUSE_THEMES = {
+    1: "self, vitality, and personal direction",
+    2: "resources, family support, and speech",
+    3: "effort, communication, and initiative",
+    4: "education, home, and emotional grounding",
+    5: "intelligence, creativity, and children",
+    6: "competition, debt, illness, and service strain",
+    7: "partnership, public engagement, and contracts",
+    8: "sudden change, vulnerability, and hidden pressure",
+    9: "fortune, teachers, dharma, and long-range support",
+    10: "profession, karma, and visible achievement",
+    11: "gains, realization, and networks",
+    12: "loss, retreat, sleep, and distant separation",
+}
 
 
 @dataclass
@@ -283,9 +301,18 @@ def build_chart(payload: ChartCalculationRequest) -> ChartData:
     planets = _compute_planets(julian_day, house_longitudes)
     house_cusps = _build_house_cusps(house_longitudes)
     dasha_summary = _build_dasha_summary(birth_utc, _find_computed_planet(planets, "Moon").longitude)
+    birth_dasha = _build_birth_dasha_snapshot(birth_utc, _find_computed_planet(planets, "Moon").longitude)
+    lifetime_dasha_timeline = _build_lifetime_dasha_timeline(
+        birth_utc,
+        _find_computed_planet(planets, "Moon").longitude,
+        [_planet_to_model(planet) for planet in planets],
+        house_cusps,
+        years=100,
+    )
     ayanamsa = swe.get_ayanamsa_ut(julian_day)
     ascendant = house_cusps[0]
     moon = _find_computed_planet(planets, "Moon")
+    planet_models = [_planet_to_model(planet) for planet in planets]
 
     summary = BirthSummary(
         name=payload.name,
@@ -320,12 +347,19 @@ def build_chart(payload: ChartCalculationRequest) -> ChartData:
         note="Derived from the computed first-house cusp subdivision used in KP reading.",
     )
     tenth_cusp = house_cusps[9]
-    strongest_career = _rank_significators([_planet_to_model(planet) for planet in planets], house_cusps, [2, 6, 10, 11])[:2]
+    strongest_career = _rank_significators(planet_models, house_cusps, [2, 6, 10, 11])[:2]
+    kp_strengths = _build_general_kp_strengths(planet_models, house_cusps, dasha_summary)
+    kp_cautions = _build_general_kp_cautions(planet_models, house_cusps, dasha_summary)
+    remedies = _build_general_remedies(house_cusps, dasha_summary, planet_models)
     interpretation = [
         f"Lagna rises in {ascendant.sign} while the janma rasi is {moon.sign} in {moon.nakshatra} pada {moon.pada}.",
         (
             f"The 10th cusp falls in {tenth_cusp.sign} with star lord {tenth_cusp.star_lord} and sub lord {tenth_cusp.sub_lord}, "
             "so professional matters are read through that chain in this chart."
+        ),
+        (
+            f"At birth the dasha opened under {birth_dasha.maha_dasha} / {birth_dasha.bhukti} / {birth_dasha.antara}, "
+            f"with a balance of {birth_dasha.balance_at_birth} remaining in the opening maha dasha."
         ),
         (
             f"The active dasha chain as of {date.today().isoformat()} is "
@@ -348,11 +382,16 @@ def build_chart(payload: ChartCalculationRequest) -> ChartData:
 
     return ChartData(
         birthSummary=summary,
-        planetaryPositions=[_planet_to_model(planet) for planet in planets],
+        planetaryPositions=planet_models,
         houseCusps=house_cusps,
         starLord=star_lord,
         subLord=sub_lord,
         dashaSummary=dasha_summary,
+        birthDasha=birth_dasha,
+        lifetimeDashaTimeline=lifetime_dasha_timeline,
+        kpStrengths=kp_strengths,
+        kpCautions=kp_cautions,
+        remedies=remedies,
         interpretation=interpretation,
         confidenceLevel=confidence,
         disclaimer=disclaimer,
@@ -770,6 +809,74 @@ def _build_dasha_summary(birth_utc: datetime, moon_longitude: float) -> DashaPer
     )
 
 
+def _build_birth_dasha_snapshot(birth_utc: datetime, moon_longitude: float) -> BirthDashaSnapshot:
+    maha, balance_fraction = _moon_maha_balance(moon_longitude)
+    maha_duration = _years_to_timedelta(DASHA_YEARS[maha])
+    maha_start = birth_utc - (maha_duration * (1 - balance_fraction))
+    birth_maha = _locate_dasha_segment("Maha Dasha", maha_start, maha, birth_utc)
+    birth_bhukti = _locate_child_dasha("Bhukti", birth_maha, birth_utc)
+    birth_antara = _locate_child_dasha("Antara", birth_bhukti, birth_utc)
+
+    return BirthDashaSnapshot(
+        mahaDasha=birth_maha.lord,
+        bhukti=birth_bhukti.lord,
+        antara=birth_antara.lord,
+        balanceAtBirth=_format_duration_years_months(birth_maha.end - birth_utc),
+        note=(
+            f"At birth the native entered life under {birth_maha.lord} maha dasha, "
+            f"{birth_bhukti.lord} bhukti, and {birth_antara.lord} antara."
+        ),
+    )
+
+
+def _build_lifetime_dasha_timeline(
+    birth_utc: datetime,
+    moon_longitude: float,
+    planetary_positions: list[PlanetaryPosition],
+    house_cusps: list[HouseCusp],
+    *,
+    years: int,
+) -> list[DashaTimelineEntry]:
+    maha, balance_fraction = _moon_maha_balance(moon_longitude)
+    maha_duration = _years_to_timedelta(DASHA_YEARS[maha])
+    maha_start = birth_utc - (maha_duration * (1 - balance_fraction))
+    horizon = birth_utc + _years_to_timedelta(years)
+    current_start = maha_start
+    current_index = VIMSHOTTARI_SEQUENCE.index(maha)
+    entries: list[DashaTimelineEntry] = []
+
+    while current_start < horizon:
+        lord = VIMSHOTTARI_SEQUENCE[current_index % len(VIMSHOTTARI_SEQUENCE)]
+        end = current_start + _years_to_timedelta(DASHA_YEARS[lord])
+        if end <= birth_utc:
+            current_start = end
+            current_index += 1
+            continue
+
+        clipped_start = max(current_start, birth_utc)
+        clipped_end = min(end, horizon)
+        assessment = _assess_period_ruler(lord, planetary_positions, house_cusps)
+        entries.append(
+            DashaTimelineEntry(
+                level="Maha Dasha",
+                ruler=lord,
+                startDate=clipped_start.date().isoformat(),
+                endDate=clipped_end.date().isoformat(),
+                startAge=_years_between(birth_utc, clipped_start),
+                endAge=_years_between(birth_utc, clipped_end),
+                quality=assessment["quality"],
+                focus=assessment["focus"],
+                goodIndicators=assessment["good_indicators"],
+                cautionIndicators=assessment["caution_indicators"],
+                remedies=assessment["remedies"],
+            )
+        )
+        current_start = end
+        current_index += 1
+
+    return entries
+
+
 def _moon_maha_balance(moon_longitude: float) -> tuple[str, float]:
     normalized = moon_longitude % 360
     nakshatra_index = int(normalized // NAKSHATRA_SPAN)
@@ -811,6 +918,24 @@ def _locate_child_dasha(level: str, parent: DashaSegment, target: datetime) -> D
 
 def _years_to_timedelta(years: float) -> timedelta:
     return timedelta(days=years * DASHA_YEAR_DAYS)
+
+
+def _years_between(start: datetime, end: datetime) -> float:
+    return round((end - start).total_seconds() / 86400 / DASHA_YEAR_DAYS, 1)
+
+
+def _format_duration_years_months(delta: timedelta) -> str:
+    total_days = max(delta.total_seconds(), 0) / 86400
+    total_months = int(round(total_days / 30.436875))
+    years = total_months // 12
+    months = total_months % 12
+    year_label = "year" if years == 1 else "years"
+    month_label = "month" if months == 1 else "months"
+    if years and months:
+        return f"{years} {year_label} {months} {month_label}"
+    if years:
+        return f"{years} {year_label}"
+    return f"{months} {month_label}"
 
 
 def _select_linked_planets(
@@ -1017,6 +1142,150 @@ def _build_age_context(topic_name: str, current_age: int, profession_signature: 
         "plain_timing_intro": "",
         "plain_direction": "",
     }
+
+
+def _assess_period_ruler(
+    lord: str,
+    planetary_positions: list[PlanetaryPosition],
+    house_cusps: list[HouseCusp],
+) -> dict[str, str | list[str]]:
+    links = _collect_house_links_for_lord(lord, planetary_positions, house_cusps)
+    supportive = [house for house in links if house in GENERAL_SUPPORTIVE_HOUSES]
+    cautionary = [house for house in links if house in GENERAL_CHALLENGING_HOUSES]
+    quality = "supportive"
+    if len(cautionary) > len(supportive):
+        quality = "challenging"
+    elif cautionary and len(cautionary) == len(supportive):
+        quality = "mixed"
+
+    unique_supportive = _unique_house_list(supportive)
+    unique_cautionary = _unique_house_list(cautionary)
+    focus_domains = _planet_career_domains(lord)
+    focus = (
+        f"{lord} period emphasizes {focus_domains[0]} while activating "
+        f"{_format_house_theme_list(unique_supportive or _unique_house_list(links[:3]))}."
+    )
+    good_indicators = (
+        [f"Supports {HOUSE_THEMES[house]} through house {house} linkage." for house in unique_supportive[:3]]
+        or ["Provides general chart support through its ruler connections."]
+    )
+    caution_indicators = (
+        [f"Needs caution around {HOUSE_THEMES[house]} through house {house} linkage." for house in unique_cautionary[:3]]
+        or ["No major cautionary house dominance is standing out in this period."]
+    )
+    remedies = _build_ruler_remedies(lord, unique_cautionary)
+
+    return {
+        "quality": quality,
+        "focus": focus,
+        "good_indicators": good_indicators,
+        "caution_indicators": caution_indicators,
+        "remedies": remedies,
+    }
+
+
+def _collect_house_links_for_lord(
+    lord: str,
+    planetary_positions: list[PlanetaryPosition],
+    house_cusps: list[HouseCusp],
+) -> list[int]:
+    houses: list[int] = []
+    planet = next((item for item in planetary_positions if item.planet == lord), None)
+    if planet:
+        occupied = _extract_house_from_note(planet.note)
+        if occupied is not None:
+            houses.append(occupied)
+        houses.extend(_houses_with_lord(house_cusps, lord, "sign"))
+        houses.extend(_houses_with_lord(house_cusps, lord, "star"))
+        houses.extend(_houses_with_lord(house_cusps, lord, "sub"))
+        houses.extend(_houses_with_lord(house_cusps, SIGN_LORDS[planet.sign], "sign"))
+    else:
+        houses.extend(_houses_with_lord(house_cusps, lord, "sign"))
+        houses.extend(_houses_with_lord(house_cusps, lord, "star"))
+        houses.extend(_houses_with_lord(house_cusps, lord, "sub"))
+    return houses
+
+
+def _unique_house_list(houses: list[int]) -> list[int]:
+    return sorted(set(house for house in houses if 1 <= house <= 12))
+
+
+def _format_house_theme_list(houses: list[int]) -> str:
+    if not houses:
+        return "general chart themes"
+    labels = [HOUSE_THEMES[house] for house in houses[:3]]
+    if len(labels) == 1:
+        return labels[0]
+    if len(labels) == 2:
+        return f"{labels[0]} and {labels[1]}"
+    return f"{labels[0]}, {labels[1]}, and {labels[2]}"
+
+
+def _build_general_kp_strengths(
+    planetary_positions: list[PlanetaryPosition],
+    house_cusps: list[HouseCusp],
+    dasha_summary: DashaPeriod,
+) -> list[str]:
+    assessments = [
+        _assess_period_ruler(dasha_summary.maha_dasha, planetary_positions, house_cusps),
+        _assess_period_ruler(dasha_summary.bhukti, planetary_positions, house_cusps),
+        _assess_period_ruler(dasha_summary.antara, planetary_positions, house_cusps),
+    ]
+    ascendant = house_cusps[0]
+    return [
+        f"Lagna rises in {ascendant.sign} with star lord {ascendant.star_lord} and sub lord {ascendant.sub_lord}, which becomes the main KP anchor for the whole chart.",
+        f"The active dasha chain {dasha_summary.maha_dasha} / {dasha_summary.bhukti} / {dasha_summary.antara} currently shows this period focus: {assessments[0]['focus']}",
+        f"Supportive chart houses are presently strongest through {_format_house_theme_list([1, 5, 9])}, together with {_format_house_theme_list([10, 11])}.",
+    ]
+
+
+def _build_general_kp_cautions(
+    planetary_positions: list[PlanetaryPosition],
+    house_cusps: list[HouseCusp],
+    dasha_summary: DashaPeriod,
+) -> list[str]:
+    current_assessment = _assess_period_ruler(dasha_summary.antara, planetary_positions, house_cusps)
+    caution_lines = list(current_assessment["caution_indicators"][:2])
+    caution_lines.append(
+        "KP judgment should still check whether houses 6, 8, and 12 are overpowering the supportive houses before making final event promises."
+    )
+    return caution_lines
+
+
+def _build_general_remedies(
+    house_cusps: list[HouseCusp],
+    dasha_summary: DashaPeriod,
+    planetary_positions: list[PlanetaryPosition],
+) -> list[str]:
+    remedies: list[str] = []
+    for lord in [dasha_summary.maha_dasha, dasha_summary.bhukti, dasha_summary.antara]:
+        remedies.extend(_build_ruler_remedies(lord, _unique_house_list(_collect_house_links_for_lord(lord, planetary_positions, house_cusps))))
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for remedy in remedies:
+        if remedy not in seen:
+            seen.add(remedy)
+            deduped.append(remedy)
+    return deduped[:6]
+
+
+def _build_ruler_remedies(lord: str, caution_houses: list[int]) -> list[str]:
+    base_map = {
+        "Sun": "Strengthen discipline, respect for mentors, and regular sunrise prayer or gratitude practice on Sundays.",
+        "Moon": "Stabilize routine, sleep, hydration, and emotional calm; Monday prayer or reflective practice can help.",
+        "Mars": "Channel heat into exercise, restraint, and disciplined action; avoid impulsive conflicts.",
+        "Mercury": "Use study, journaling, prayer, mantra, and clear speech discipline to stabilize Mercury periods.",
+        "Jupiter": "Seek guidance from teachers, charity, spiritual study, and Thursday discipline to strengthen Jupiter.",
+        "Venus": "Maintain harmony, cleanliness, beauty, gratitude, and balanced relationships during Venus periods.",
+        "Saturn": "Use patience, service, humility, routine, and steady effort to handle Saturn-linked delays well.",
+        "Rahu": "Keep boundaries, reduce excess, verify decisions carefully, and use grounding practices during Rahu periods.",
+        "Ketu": "Use prayer, detachment, inner discipline, and focused spiritual practice to steady Ketu periods.",
+    }
+    remedies = [base_map.get(lord, "Maintain discipline, prayer, and careful judgment during this period.")]
+    if any(house in {6, 8, 12} for house in caution_houses):
+        remedies.append("Because dusthana houses are involved, avoid rushed decisions and keep regular spiritual or reflective discipline.")
+    return remedies
 
 
 def _describe_profession_signature(linked_planets: list[PlanetaryPosition], dominant_cusp: HouseCusp) -> str:

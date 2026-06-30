@@ -80,6 +80,32 @@ class DashaPeriod(BaseModel):
     note: str
 
 
+class BirthDashaSnapshot(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    maha_dasha: str = Field(..., alias="mahaDasha")
+    bhukti: str
+    antara: str
+    balance_at_birth: str = Field(..., alias="balanceAtBirth")
+    note: str
+
+
+class DashaTimelineEntry(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    level: str
+    ruler: str
+    start_date: str = Field(..., alias="startDate")
+    end_date: str = Field(..., alias="endDate")
+    start_age: float = Field(..., alias="startAge")
+    end_age: float = Field(..., alias="endAge")
+    quality: str
+    focus: str
+    good_indicators: list[str] = Field(..., alias="goodIndicators")
+    caution_indicators: list[str] = Field(..., alias="cautionIndicators")
+    remedies: list[str]
+
+
 class RulingFactor(BaseModel):
     area: str
     ruler: str
@@ -105,6 +131,11 @@ class ChartData(BaseModel):
     star_lord: RulingFactor = Field(..., alias="starLord")
     sub_lord: RulingFactor = Field(..., alias="subLord")
     dasha_summary: DashaPeriod = Field(..., alias="dashaSummary")
+    birth_dasha: BirthDashaSnapshot = Field(..., alias="birthDasha")
+    lifetime_dasha_timeline: list[DashaTimelineEntry] = Field(..., alias="lifetimeDashaTimeline")
+    kp_strengths: list[str] = Field(..., alias="kpStrengths")
+    kp_cautions: list[str] = Field(..., alias="kpCautions")
+    remedies: list[str]
     interpretation: list[str]
     confidence_level: ConfidenceLevel = Field(..., alias="confidenceLevel")
     disclaimer: str

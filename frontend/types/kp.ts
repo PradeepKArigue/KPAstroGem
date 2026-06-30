@@ -107,6 +107,28 @@ export type DashaSummary = {
   note: string;
 };
 
+export type BirthDashaSnapshot = {
+  mahaDasha: string;
+  bhukti: string;
+  antara: string;
+  balanceAtBirth: string;
+  note: string;
+};
+
+export type DashaTimelineEntry = {
+  level: string;
+  ruler: string;
+  startDate: string;
+  endDate: string;
+  startAge: number;
+  endAge: number;
+  quality: string;
+  focus: string;
+  goodIndicators: string[];
+  cautionIndicators: string[];
+  remedies: string[];
+};
+
 export type RulingFactor = {
   area: string;
   ruler: string;
@@ -130,6 +152,11 @@ export type ChartData = {
   starLord: RulingFactor;
   subLord: RulingFactor;
   dashaSummary: DashaSummary;
+  birthDasha: BirthDashaSnapshot;
+  lifetimeDashaTimeline: DashaTimelineEntry[];
+  kpStrengths: string[];
+  kpCautions: string[];
+  remedies: string[];
   interpretation: string[];
   confidenceLevel: ConfidenceLevel;
   disclaimer: string;
