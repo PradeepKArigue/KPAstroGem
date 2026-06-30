@@ -23,8 +23,8 @@ const foundationDone = [
 
 const nextBuildStages = [
   "Add true advanced KP birth settings across the stack: ayanamsa selection, DST correction controls, chart style preference, and optional KP horary number.",
-  "Replace modeled chart values with an ephemeris-backed KP calculation engine for planets, cusps, nakshatras, star lords, sub lords, and dasha timing.",
-  "Store curated KP rules and house mappings so answers come from repeatable logic rather than placeholder narratives.",
+  "Deepen the automated KP interpretation layer so significator ranking, event promise, and timing logic move closer to practitioner-style reading depth.",
+  "Store curated KP rules and house mappings so answers come from repeatable logic rather than broad generic narratives.",
   "Generate a proper server-side PDF report with stable pagination and export-ready tables.",
   "Introduce more KP utilities inspired by the public product landscape: ruling planets, transit overlays, and richer timing drill-downs.",
 ];
@@ -32,7 +32,7 @@ const nextBuildStages = [
 const guardrails = [
   "KP astrology is presented here as a traditional interpretive system, not a scientific guarantee.",
   "Health, legal, finance, and high-stakes topics must stay clearly labeled as cautionary and interpretive.",
-  "The current build still contains modeled outputs and says so explicitly until verified KP math is integrated.",
+  "Astronomical values are now computed, but automated interpretation still needs continued KP validation and refinement.",
 ];
 
 export default function MethodologyPage() {
@@ -47,7 +47,7 @@ export default function MethodologyPage() {
           <p className="mt-5 max-w-4xl text-base leading-7 text-midnight/75">
             As of June 28, 2026, the product direction is to move this app closer to the public KP-style
             experience users recognize from sites such as AstroSage, while keeping the implementation honest:
-            clearer KP logic now, full verified KP calculation layers next.
+            real KP calculation layers now, deeper verified interpretation layers next.
           </p>
         </section>
 

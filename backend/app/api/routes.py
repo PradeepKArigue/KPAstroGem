@@ -21,8 +21,8 @@ from app.schemas.places import (
 from app.services.chart_sessions import chart_session_store
 from app.services.geocoding import resolve_timezone, search_locations, validate_location
 from app.services.kp_engine import (
-    build_placeholder_chart,
-    build_placeholder_question_answer,
+    build_chart,
+    build_question_answer,
     get_supported_question_topics,
 )
 
@@ -114,7 +114,10 @@ async def validate_selected_location(payload: LocationValidationRequest) -> Loca
 
 @router.post("/api/charts/calculate", response_model=ChartCalculationResponse)
 async def calculate_chart(payload: ChartCalculationRequest) -> ChartCalculationResponse:
-    chart = build_placeholder_chart(payload)
+    try:
+        chart = build_chart(payload)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="The chart could not be calculated from the provided birth details.") from exc
     session = chart_session_store.create(chart)
     return ChartCalculationResponse(chartId=session.chart_id, chart=session.chart_data)
 
@@ -161,7 +164,7 @@ async def ask_question(payload: ChartQuestionRequest) -> ChartQuestionResponse:
     if session is None:
         raise HTTPException(status_code=404, detail="Chart session not found or expired.")
 
-    answer = build_placeholder_question_answer(session.chart_data, payload.question, payload.optional_date_range)
+    answer = build_question_answer(session.chart_data, payload.question, payload.optional_date_range)
     chart_session_store.add_question_answer(payload.chart_id, answer)
     return answer
 

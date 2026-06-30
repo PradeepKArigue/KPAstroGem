@@ -98,8 +98,8 @@ export function ReportView({ chartId }: { chartId: string }) {
         </h1>
         <p className="mt-5 max-w-4xl text-base leading-7 text-midnight/75">
           This report now includes chart identity, Rasi and Jathakam details, planet and cusp tables,
-          derived significator logic, and a date-based dasha reading layer. The current output is still
-          clearly marked as modeled until a fully verified KP calculation engine is integrated.
+          derived significator logic, and a date-based dasha reading layer. Astronomical chart values are
+          computed, while the automated interpretive layer is still being refined.
         </p>
         <div className="mt-6 flex flex-wrap gap-3 print:hidden">
           <button
@@ -192,7 +192,7 @@ export function ReportView({ chartId }: { chartId: string }) {
           />
           <ReadingStep
             title="Activation matrix explains emphasis"
-            detail="The house-activation grid is a compact way to see which houses a planet is modeled to support more strongly."
+            detail="The house-activation grid is a compact way to see which houses a planet connects to more strongly in the current computed reading."
           />
           <ReadingStep
             title="Dasha windows explain timing"
@@ -257,8 +257,8 @@ export function ReportView({ chartId }: { chartId: string }) {
           ])}
         />
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <LegendItem code="L4" text="Strongest modeled connection from occupied or sign-lord linkage." />
-          <LegendItem code="L3" text="Strong modeled support from star-lord mapping." />
+          <LegendItem code="L4" text="Strongest computed connection from occupied or sign-lord linkage." />
+          <LegendItem code="L3" text="Strong computed support from star-lord mapping." />
           <LegendItem code="L2" text="Secondary support from sub-lord mapping." />
           <LegendItem code="L1" text="Light influence via neighboring house relationship." />
         </div>
@@ -326,7 +326,7 @@ function buildChartOrientationRows(birthSummary: BirthSummary, houseCusps: House
   const tenthHouse = houseCusps.find((cusp) => cusp.house === 10);
 
   return [
-    ["Ayanamsa mode", "KP New (modeled)"],
+    ["Ayanamsa mode", "KP New"],
     ["Ascendant cue", firstHouse ? `${firstHouse.sign} ${firstHouse.cuspDegree}` : "Pending"],
     ["Moon-sign cue", moonHouse ? `${moonHouse.sign} ${moonHouse.cuspDegree}` : "Pending"],
     ["Career cusp cue", tenthHouse ? `${tenthHouse.sign} ${tenthHouse.cuspDegree}` : "Pending"],
@@ -345,7 +345,7 @@ function buildRasiAndJathakamRows(
   const careerCusp = cusps.find((cusp) => cusp.house === 10) ?? cusps[9] ?? cusps[0];
 
   return [
-    ["Ayanamsa", "KP New (modeled)"],
+    ["Ayanamsa", "KP New"],
     ["Lagna / Ascendant", `${lagna.sign} ${lagna.cuspDegree}`],
     ["Lagna lord", lagna.signLord],
     ["Janma rasi", moon.sign],
@@ -476,7 +476,7 @@ function buildShortKPReading(position: PlanetaryPosition, derived: PlanetDerived
 function buildDashaRows(window: string, mahaDasha: string): DashaPeriodRow[] {
   const match = window.match(/(\d{4})-(\d{2})\s+to\s+(\d{4})-(\d{2})/i);
   if (!match) {
-    return [{ level: "Current", ruler: mahaDasha, window, focus: "Modeled timing window from the active chart session." }];
+    return [{ level: "Current", ruler: mahaDasha, window, focus: "Computed timing window from the active chart session." }];
   }
 
   const [, startYear, startMonth, endYear, endMonth] = match;
@@ -492,7 +492,7 @@ function buildDashaRows(window: string, mahaDasha: string): DashaPeriodRow[] {
     level: "Maha Dasha",
     ruler: mahaDasha,
     window,
-    focus: `${mahaDasha} remains the report anchor for this active modeled period.`,
+    focus: `${mahaDasha} remains the report anchor for this active computed period.`,
   });
 
   for (let index = 0; index < segmentCount; index += 1) {
@@ -503,7 +503,7 @@ function buildDashaRows(window: string, mahaDasha: string): DashaPeriodRow[] {
       level: `Bhukti ${index + 1}`,
       ruler,
       window: `${formatMonthYear(segmentStart)} to ${formatMonthYear(segmentEnd)}`,
-      focus: `${ruler} is used as the narrative focus for this modeled sub-period.`,
+      focus: `${ruler} is used as the narrative focus for this computed sub-period.`,
     });
   }
 
