@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from hashlib import sha256
 
 from app.schemas.chart import (
@@ -235,26 +236,50 @@ def build_placeholder_question_answer(
 ) -> ChartQuestionResponse:
     topic = _infer_topic(question, chart.birth_summary.question_category)
     dominant_cusp = chart.house_cusps[(topic.house_focus[0] - 1) % len(chart.house_cusps)]
+    lagna_cusp = chart.house_cusps[0]
+    moon = _find_planet(chart, "Moon")
+    antara_planet = _find_planet(chart, chart.dasha_summary.antara)
+    current_week = _current_week_window()
     supporting_planets = [
         chart.planetary_positions[topic.house_focus[0] % len(chart.planetary_positions)],
         chart.planetary_positions[topic.house_focus[-1] % len(chart.planetary_positions)],
     ]
 
     cusp_sub_lord_analysis = [
+        (
+            f"Jathakam context starts from lagna {lagna_cusp.sign} with janma rasi {moon.sign} "
+            f"and janma nakshatra {moon.nakshatra} pada {moon.pada}."
+        ),
         f"House focus for {topic.name.lower()} questions is mapped to houses {', '.join(str(house) for house in topic.house_focus)} in this KP-style engine.",
         f"The leading cusp review starts from house {dominant_cusp.house}, where the star lord is {dominant_cusp.star_lord} and the sub lord is {dominant_cusp.sub_lord}.",
     ]
     significator_analysis = [
-        f"{supporting_planets[0].planet} is acting as a modeled significator through {supporting_planets[0].nakshatra} and sub lord {supporting_planets[0].sub_lord}.",
-        f"{supporting_planets[1].planet} adds a secondary signal through {supporting_planets[1].sign} and star lord {supporting_planets[1].star_lord}.",
+        (
+            f"{supporting_planets[0].planet} is acting as a modeled significator through "
+            f"{supporting_planets[0].sign}, {supporting_planets[0].nakshatra}, and sub lord {supporting_planets[0].sub_lord}."
+        ),
+        (
+            f"{supporting_planets[1].planet} adds a secondary signal through "
+            f"{supporting_planets[1].sign}, star lord {supporting_planets[1].star_lord}, and pada {supporting_planets[1].pada}."
+        ),
     ]
     dasha_support = [
-        f"The current modeled dasha chain is {chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / {chart.dasha_summary.antara}.",
+        (
+            f"As of {current_week['today']}, the active modeled dasha chain is "
+            f"{chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / {chart.dasha_summary.antara}."
+        ),
+        (
+            f"For the week of {current_week['start']} to {current_week['end']}, "
+            f"the antara focus is read through {antara_planet.sign}, {antara_planet.nakshatra}, and sub lord {antara_planet.sub_lord}."
+        ),
         f"Timing focus is being framed around {optional_date_range or chart.dasha_summary.window}.",
     ]
     supporting_factors = [
         f"The active house group {', '.join(str(house) for house in topic.house_focus)} supports a focused reading for {topic.name.lower()}.",
-        f"The chart's current ruling emphasis on {chart.star_lord.ruler} and {chart.sub_lord.ruler} adds continuity to the answer narrative.",
+        (
+            f"The chart's current ruling emphasis on {chart.star_lord.ruler} and {chart.sub_lord.ruler}, "
+            f"along with moon sign {moon.sign}, adds continuity to the answer narrative."
+        ),
     ]
     blocking_factors = [
         "Exact event promise versus denial is still limited because the final KP significator ranking engine is not yet implemented.",
@@ -279,7 +304,15 @@ def build_placeholder_question_answer(
 
     interpretation = [
         f"The question was classified under {topic.name}.",
+        (
+            f"This jathakam currently reads from lagna {lagna_cusp.sign}, janma rasi {moon.sign}, "
+            f"and janma nakshatra {moon.nakshatra} pada {moon.pada}."
+        ),
         f"The chart currently emphasizes houses {', '.join(str(house) for house in topic.house_focus)} with cusp sub lord {dominant_cusp.sub_lord} as a leading signal.",
+        (
+            f"The active dasha chain {chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / "
+            f"{chart.dasha_summary.antara} is being used as the timing layer for the current date and week."
+        ),
         f"The modeled reading suggests a {chart.dasha_summary.status.lower()} trend with more value in timing, preparation, and pattern recognition than in absolute certainty.",
     ]
     timing_window = optional_date_range or chart.dasha_summary.window
@@ -289,6 +322,10 @@ def build_placeholder_question_answer(
     )
     calculation_trail = [
         CalculationTrailEntry(step="Question classification", detail=f"Mapped the question to topic {topic.name}."),
+        CalculationTrailEntry(
+            step="Jathakam context",
+            detail=f"Referenced lagna {lagna_cusp.sign}, janma rasi {moon.sign}, and nakshatra {moon.nakshatra} pada {moon.pada}.",
+        ),
         CalculationTrailEntry(
             step="House mapping",
             detail=f"Selected houses {', '.join(str(house) for house in topic.house_focus)} for this topic.",
@@ -388,6 +425,26 @@ def _build_dasha_summary(seed: int) -> DashaPeriod:
         status="Modeled",
         note="This is a profile-responsive modeled dasha view for the MVP. A true Vimshottari KP timing engine is still pending.",
     )
+
+
+def _find_planet(chart: ChartData, planet_name: str) -> PlanetaryPosition:
+    for planet in chart.planetary_positions:
+        if planet.planet == planet_name:
+            return planet
+
+    return chart.planetary_positions[0]
+
+
+def _current_week_window() -> dict[str, str]:
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    return {
+        "today": today.isoformat(),
+        "start": week_start.isoformat(),
+        "end": week_end.isoformat(),
+    }
 
 
 def _format_degree(value: float) -> str:

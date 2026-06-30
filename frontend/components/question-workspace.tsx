@@ -95,6 +95,9 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
     return <div className="glass-panel p-8 text-sm text-midnight/70">The chart session is unavailable.</div>;
   }
 
+  const moon = session.chartData.planetaryPositions.find((planet) => planet.planet === "Moon");
+  const lagna = session.chartData.houseCusps.find((cusp) => cusp.house === 1);
+
   return (
     <div className="space-y-6">
       <section className="glass-panel p-6 sm:p-8">
@@ -120,6 +123,15 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
           <SessionBadge
             label="Birth location"
             value={`${session.chartData.birthSummary.birthPlace}, ${session.chartData.birthSummary.country}`}
+          />
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SessionBadge label="Lagna" value={lagna ? `${lagna.sign} ${lagna.cuspDegree}` : "Pending"} />
+          <SessionBadge label="Janma rasi" value={moon?.sign ?? "Pending"} />
+          <SessionBadge label="Nakshatra" value={moon ? `${moon.nakshatra} Pada ${moon.pada}` : "Pending"} />
+          <SessionBadge
+            label="Dasha chain"
+            value={`${session.chartData.dashaSummary.mahaDasha} / ${session.chartData.dashaSummary.bhukti} / ${session.chartData.dashaSummary.antara}`}
           />
         </div>
       </section>

@@ -8,6 +8,7 @@ import type {
   BirthSummary,
   ChartQuestionResponse,
   ChartSessionResponse,
+  DashaSummary,
   HouseCusp,
   PlanetaryPosition,
 } from "@/types/kp";
@@ -15,7 +16,7 @@ import type {
 const houseLabels = Array.from({ length: 12 }, (_, index) => `H${index + 1}`);
 const dashaPlanetOrder = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"];
 
-type RelationshipStrength = "L1" | "L2" | "L3" | "L4" | "—";
+type RelationshipStrength = "L1" | "L2" | "L3" | "L4" | "-";
 
 type PlanetDerivedDetails = {
   occupiedHouse: number | null;
@@ -78,8 +79,15 @@ export function ReportView({ chartId }: { chartId: string }) {
 
   const { chartData, questionHistory } = session;
   const derivedPlanetDetails = buildPlanetDerivedDetails(chartData.planetaryPositions, chartData.houseCusps);
-  const dashaRows = buildDashaRows(chartData.birthSummary, chartData.dashaSummary.window, chartData.dashaSummary.mahaDasha);
   const chartOrientationRows = buildChartOrientationRows(chartData.birthSummary, chartData.houseCusps);
+  const rasiRows = buildRasiAndJathakamRows(chartData.birthSummary, chartData.planetaryPositions, chartData.houseCusps);
+  const dashaRows = buildDashaRows(chartData.dashaSummary.window, chartData.dashaSummary.mahaDasha);
+  const dashaNarrative = buildCurrentDashaNarrative(
+    chartData.birthSummary,
+    chartData.planetaryPositions,
+    chartData.houseCusps,
+    chartData.dashaSummary,
+  );
 
   return (
     <div className="space-y-6 print:space-y-4">
@@ -89,9 +97,9 @@ export function ReportView({ chartId }: { chartId: string }) {
           {chartData.birthSummary.name}&apos;s KP-style report
         </h1>
         <p className="mt-5 max-w-4xl text-base leading-7 text-midnight/75">
-          This report now follows the denser, table-first style seen in traditional chart exports: chart identity,
-          planet table, cusp table, derived significator matrix, activation matrix, and dasha ladders, while still
-          clearly marking modeled sections until the full KP engine is integrated.
+          This report now includes chart identity, Rasi and Jathakam details, planet and cusp tables,
+          derived significator logic, and a date-based dasha reading layer. The current output is still
+          clearly marked as modeled until the full KP calculation engine is integrated.
         </p>
         <div className="mt-6 flex flex-wrap gap-3 print:hidden">
           <button
@@ -148,11 +156,31 @@ export function ReportView({ chartId }: { chartId: string }) {
         </TableCard>
       </section>
 
+      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr] print:grid-cols-1">
+        <TableCard title="Rasi and Jathakam Details">
+          <DenseTable headers={["Field", "Value"]} rows={rasiRows} />
+        </TableCard>
+
+        <TableCard title="Current Dasha and Week Reading">
+          <div className="space-y-3">
+            {dashaNarrative.map((item) => (
+              <div key={item} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-7 text-midnight/70">
+                {item}
+              </div>
+            ))}
+          </div>
+        </TableCard>
+      </section>
+
       <TableCard title="How To Read This KP Report">
         <div className="grid gap-3 lg:grid-cols-2">
           <ReadingStep
             title="Birth normalization first"
             detail="The app confirms birthplace, coordinates, timezone, and normalized UTC time before any chart session is created."
+          />
+          <ReadingStep
+            title="Rasi and Jathakam context"
+            detail="Read lagna, janma rasi, and janma nakshatra first. They give the chart's identity before topic-specific interpretation starts."
           />
           <ReadingStep
             title="Cusps drive the reading"
@@ -168,11 +196,7 @@ export function ReportView({ chartId }: { chartId: string }) {
           />
           <ReadingStep
             title="Dasha windows explain timing"
-            detail="The dasha ladder is the timing layer. In a full KP engine, this should help separate event promise from event timing."
-          />
-          <ReadingStep
-            title="Q&A should cite the trail"
-            detail="Every topic answer should connect the life question to houses, cusp logic, significators, and dasha support rather than giving a generic paragraph."
+            detail="The dasha reading now includes current-date and current-week framing. In a full KP engine, this should separate event promise from event timing."
           />
         </div>
       </TableCard>
@@ -310,13 +334,57 @@ function buildChartOrientationRows(birthSummary: BirthSummary, houseCusps: House
   ];
 }
 
+function buildRasiAndJathakamRows(
+  birthSummary: BirthSummary,
+  planets: PlanetaryPosition[],
+  cusps: HouseCusp[],
+): string[][] {
+  const moon = findPlanet(planets, "Moon");
+  const sun = findPlanet(planets, "Sun");
+  const lagna = cusps.find((cusp) => cusp.house === 1) ?? cusps[0];
+  const careerCusp = cusps.find((cusp) => cusp.house === 10) ?? cusps[9] ?? cusps[0];
+
+  return [
+    ["Ayanamsa", "KP New (modeled MVP)"],
+    ["Lagna / Ascendant", `${lagna.sign} ${lagna.cuspDegree}`],
+    ["Lagna lord", lagna.signLord],
+    ["Janma rasi", moon.sign],
+    ["Janma nakshatra", `${moon.nakshatra} Pada ${moon.pada}`],
+    ["Moon star / sub lord", `${moon.starLord} / ${moon.subLord}`],
+    ["Sun sign cue", `${sun.sign} ${sun.degree}`],
+    ["Career cusp", `${careerCusp.sign} ${careerCusp.cuspDegree}`],
+    ["Birth timezone", birthSummary.timezone],
+    ["Coordinates", `${birthSummary.latitude ?? "Pending"}, ${birthSummary.longitude ?? "Pending"}`],
+  ];
+}
+
+function buildCurrentDashaNarrative(
+  birthSummary: BirthSummary,
+  planets: PlanetaryPosition[],
+  cusps: HouseCusp[],
+  dashaSummary: DashaSummary,
+) {
+  const today = new Date();
+  const week = getWeekWindow(today);
+  const antaraPlanet = findPlanet(planets, dashaSummary.antara);
+  const bhuktiPlanet = findPlanet(planets, dashaSummary.bhukti);
+  const moon = findPlanet(planets, "Moon");
+  const lagna = cusps.find((cusp) => cusp.house === 1) ?? cusps[0];
+
+  return [
+    `As of ${formatLongDate(today)}, the active dasha chain for this session is ${dashaSummary.mahaDasha} / ${dashaSummary.bhukti} / ${dashaSummary.antara}.`,
+    `For the week of ${formatShortDate(week.start)} to ${formatShortDate(week.end)}, the antara signal is being read through ${antaraPlanet.sign}, ${antaraPlanet.nakshatra}, and sub lord ${antaraPlanet.subLord}.`,
+    `The bhukti layer is currently being framed through ${bhuktiPlanet.sign}, star lord ${bhuktiPlanet.starLord}, and the chart's lagna ${lagna.sign}.`,
+    `This jathakam currently combines janma rasi ${moon.sign}, janma nakshatra ${moon.nakshatra}, and active window ${dashaSummary.window} as the main timing story for date-based interpretation.`,
+  ];
+}
+
 function buildPlanetDerivedDetails(planets: PlanetaryPosition[], cusps: HouseCusp[]): Record<string, PlanetDerivedDetails> {
   const houseBySign = new Map<string, number>();
   const houseByPlanet = new Map<string, number>();
-  const cuspByHouse = new Map<number, HouseCusp>();
+  const details: Record<string, PlanetDerivedDetails> = {};
 
   for (const cusp of cusps) {
-    cuspByHouse.set(cusp.house, cusp);
     if (!houseBySign.has(cusp.sign)) {
       houseBySign.set(cusp.sign, cusp.house);
     }
@@ -328,8 +396,6 @@ function buildPlanetDerivedDetails(planets: PlanetaryPosition[], cusps: HouseCus
       houseByPlanet.set(planet.planet, occupiedHouse);
     }
   }
-
-  const details: Record<string, PlanetDerivedDetails> = {};
 
   for (const planet of planets) {
     const occupiedHouse = houseByPlanet.get(planet.planet) ?? null;
@@ -384,7 +450,7 @@ function deriveRelationshipStrength(
     return "L1";
   }
 
-  return "—";
+  return "-";
 }
 
 function wrapHouse(house: number) {
@@ -407,7 +473,7 @@ function buildShortKPReading(position: PlanetaryPosition, derived: PlanetDerived
   ].join("; ");
 }
 
-function buildDashaRows(birthSummary: BirthSummary, window: string, mahaDasha: string): DashaPeriodRow[] {
+function buildDashaRows(window: string, mahaDasha: string): DashaPeriodRow[] {
   const match = window.match(/(\d{4})-(\d{2})\s+to\s+(\d{4})-(\d{2})/i);
   if (!match) {
     return [{ level: "Current", ruler: mahaDasha, window, focus: "Modeled timing window from the active chart session." }];
@@ -452,6 +518,18 @@ function clampDate(date: Date, maxDate: Date) {
   return date.getTime() > maxDate.getTime() ? maxDate : date;
 }
 
+function getWeekWindow(date: Date) {
+  const start = new Date(date);
+  const day = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - day);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  return { start, end };
+}
+
 function monthDiff(start: Date, end: Date) {
   return (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + (end.getUTCMonth() - start.getUTCMonth());
 }
@@ -462,6 +540,26 @@ function formatMonthYear(date: Date) {
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+function formatLongDate(date: Date) {
+  return date.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatShortDate(date: Date) {
+  return date.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function findPlanet(planets: PlanetaryPosition[], planetName: string) {
+  return planets.find((planet) => planet.planet === planetName) ?? planets[0];
 }
 
 function formatHouseRef(house: number | null) {
