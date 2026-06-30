@@ -303,6 +303,8 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
                 <AnswerFocusCard title="Direct Answer" detail={answer.answerSummary.directAnswer} />
                 <AnswerFocusCard title="Best Timing" detail={answer.answerSummary.bestTiming} />
                 <AnswerFocusCard title="What This Means" detail={answer.answerSummary.practicalMeaning} />
+                <AnswerFocusCard title="Supported Planets And Cusps" detail={answer.answerSummary.supportedBy} />
+                <AnswerFocusCard title="What Does Not Support" detail={answer.answerSummary.cautionBy} />
                 <AnswerFocusCard title="Why KP Says This" detail={answer.answerSummary.kpReason} />
               </div>
 
@@ -489,6 +491,7 @@ function buildPriorityHighlights(answer: ChartQuestionResponse) {
     answer.answerSummary.directAnswer,
     answer.answerSummary.bestTiming,
     answer.answerSummary.practicalMeaning,
+    answer.answerSummary.supportedBy,
     answer.supportingFactors[0] ?? "Supporting factors are still being assembled for this answer.",
   ];
 }

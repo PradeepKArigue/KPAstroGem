@@ -128,6 +128,8 @@ class CustomerAnswerSummary(BaseModel):
     direct_answer: str = Field(..., alias="directAnswer")
     best_timing: str = Field(..., alias="bestTiming")
     practical_meaning: str = Field(..., alias="practicalMeaning")
+    supported_by: str = Field(..., alias="supportedBy")
+    caution_by: str = Field(..., alias="cautionBy")
     kp_reason: str = Field(..., alias="kpReason")
 
 

@@ -579,6 +579,8 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         profession_signature=profession_signature,
         age_context=age_context,
         evaluation=evaluation,
+        scored_significators=scored_significators,
+        obstructing_significators=obstructing_significators,
     )
 
     caution_disclaimer = (
@@ -705,10 +707,14 @@ def _build_customer_answer_summary(
     profession_signature: str,
     age_context: dict[str, str | bool],
     evaluation: TopicEvaluation,
+    scored_significators: list[ScoredSignificator],
+    obstructing_significators: list[ScoredSignificator],
 ) -> CustomerAnswerSummary:
     direct_answer = _build_direct_answer(topic_name, trend, current_age)
     best_timing = _build_best_timing_line(topic_name, timing_window, current_age, profession_signature)
     practical_meaning = _build_practical_meaning(topic_name, trend, current_age, profession_signature)
+    supported_by = _build_supported_by_line(dominant_cusp, scored_significators, evaluation)
+    caution_by = _build_caution_by_line(obstructing_significators, evaluation)
     kp_reason = (
         f"KP checked houses {', '.join(str(h) for h in TOPIC_CONTEXT.get(topic_name, TOPIC_CONTEXT['Career'])['supporting'])}, "
         f"the cusp chain {dominant_cusp.sign_lord}/{dominant_cusp.star_lord}/{dominant_cusp.sub_lord}, and the active dasha "
@@ -719,7 +725,34 @@ def _build_customer_answer_summary(
         directAnswer=direct_answer,
         bestTiming=best_timing,
         practicalMeaning=practical_meaning,
+        supportedBy=supported_by,
+        cautionBy=caution_by,
         kpReason=kp_reason,
+    )
+
+
+def _build_supported_by_line(
+    dominant_cusp: HouseCusp,
+    scored_significators: list[ScoredSignificator],
+    evaluation: TopicEvaluation,
+) -> str:
+    lead_planets = ", ".join(item.planet.planet for item in scored_significators[:3]) or "no strong planets yet"
+    cusp_support = ", ".join(evaluation.supportive_cusp_links[:2]) or f"H{dominant_cusp.house} {dominant_cusp.sign_lord}/{dominant_cusp.star_lord}/{dominant_cusp.sub_lord}"
+    return (
+        f"Supported by: strongest helpful planets are {lead_planets}. The main favorable cusp support comes through {cusp_support}, "
+        f"especially the lord chain {dominant_cusp.sign_lord}/{dominant_cusp.star_lord}/{dominant_cusp.sub_lord}."
+    )
+
+
+def _build_caution_by_line(
+    obstructing_significators: list[ScoredSignificator],
+    evaluation: TopicEvaluation,
+) -> str:
+    caution_planets = ", ".join(item.planet.planet for item in obstructing_significators[:2]) or "no single caution planet"
+    caution_cusps = ", ".join(evaluation.caution_cusp_links[:2]) or "general obstructing-house pressure"
+    return (
+        f"Caution by: planets needing watch are {caution_planets}. The weaker side of the chart is currently coming through {caution_cusps}, "
+        "so these links may delay, weaken, or complicate results if they dominate the running period."
     )
 
 

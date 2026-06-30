@@ -149,6 +149,8 @@ export type CustomerAnswerSummary = {
   directAnswer: string;
   bestTiming: string;
   practicalMeaning: string;
+  supportedBy: string;
+  cautionBy: string;
   kpReason: string;
 };
 
