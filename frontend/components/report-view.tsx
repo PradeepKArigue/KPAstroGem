@@ -14,7 +14,20 @@ import type {
 } from "@/types/kp";
 
 const houseLabels = Array.from({ length: 12 }, (_, index) => `H${index + 1}`);
-const dashaPlanetOrder = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"];
+const signLords: Record<string, string> = {
+  Aries: "Mars",
+  Taurus: "Venus",
+  Gemini: "Mercury",
+  Cancer: "Moon",
+  Leo: "Sun",
+  Virgo: "Mercury",
+  Libra: "Venus",
+  Scorpio: "Mars",
+  Sagittarius: "Jupiter",
+  Capricorn: "Saturn",
+  Aquarius: "Saturn",
+  Pisces: "Jupiter",
+};
 
 type RelationshipStrength = "L1" | "L2" | "L3" | "L4" | "-";
 
@@ -79,9 +92,9 @@ export function ReportView({ chartId }: { chartId: string }) {
 
   const { chartData, questionHistory } = session;
   const derivedPlanetDetails = buildPlanetDerivedDetails(chartData.planetaryPositions, chartData.houseCusps);
-  const chartOrientationRows = buildChartOrientationRows(chartData.birthSummary, chartData.houseCusps);
+  const chartOrientationRows = buildChartOrientationRows(chartData.birthSummary, chartData.planetaryPositions, chartData.houseCusps);
   const rasiRows = buildRasiAndJathakamRows(chartData.birthSummary, chartData.planetaryPositions, chartData.houseCusps);
-  const dashaRows = buildDashaRows(chartData.dashaSummary.window, chartData.dashaSummary.mahaDasha);
+  const dashaRows = buildDashaRows(chartData.dashaSummary);
   const dashaNarrative = buildCurrentDashaNarrative(
     chartData.birthSummary,
     chartData.planetaryPositions,
@@ -307,6 +320,14 @@ export function ReportView({ chartId }: { chartId: string }) {
         </div>
       </TableCard>
 
+      <TableCard title="Topic Readiness Snapshot">
+        <div className="grid gap-3 lg:grid-cols-2">
+          {buildTopicReadinessRows(chartData.houseCusps).map((item) => (
+            <ReadingStep key={item.title} title={item.title} detail={item.detail} />
+          ))}
+        </div>
+      </TableCard>
+
       {questionHistory.length > 0 ? (
         <TableCard title="Detailed Question and Answer History">
           <div className="space-y-4">
@@ -320,15 +341,15 @@ export function ReportView({ chartId }: { chartId: string }) {
   );
 }
 
-function buildChartOrientationRows(birthSummary: BirthSummary, houseCusps: HouseCusp[]) {
+function buildChartOrientationRows(birthSummary: BirthSummary, planets: PlanetaryPosition[], houseCusps: HouseCusp[]) {
   const firstHouse = houseCusps.find((cusp) => cusp.house === 1);
-  const moonHouse = houseCusps.find((cusp) => cusp.house === 8) ?? houseCusps[0];
+  const moon = findPlanet(planets, "Moon");
   const tenthHouse = houseCusps.find((cusp) => cusp.house === 10);
 
   return [
     ["Ayanamsa mode", "KP New"],
     ["Ascendant cue", firstHouse ? `${firstHouse.sign} ${firstHouse.cuspDegree}` : "Pending"],
-    ["Moon-sign cue", moonHouse ? `${moonHouse.sign} ${moonHouse.cuspDegree}` : "Pending"],
+    ["Moon-sign cue", moon ? `${moon.sign} ${moon.degree}` : "Pending"],
     ["Career cusp cue", tenthHouse ? `${tenthHouse.sign} ${tenthHouse.cuspDegree}` : "Pending"],
     ["Location confidence", `${birthSummary.birthPlace}, ${birthSummary.country}`],
   ];
@@ -380,18 +401,16 @@ function buildCurrentDashaNarrative(
 }
 
 function buildPlanetDerivedDetails(planets: PlanetaryPosition[], cusps: HouseCusp[]): Record<string, PlanetDerivedDetails> {
-  const houseBySign = new Map<string, number>();
+  const houseBySign = new Map<string, number[]>();
   const houseByPlanet = new Map<string, number>();
   const details: Record<string, PlanetDerivedDetails> = {};
 
   for (const cusp of cusps) {
-    if (!houseBySign.has(cusp.sign)) {
-      houseBySign.set(cusp.sign, cusp.house);
-    }
+    houseBySign.set(cusp.sign, [...(houseBySign.get(cusp.sign) ?? []), cusp.house]);
   }
 
   for (const planet of planets) {
-    const occupiedHouse = houseBySign.get(planet.sign) ?? null;
+    const occupiedHouse = houseBySign.get(planet.sign)?.[0] ?? null;
     if (occupiedHouse != null) {
       houseByPlanet.set(planet.planet, occupiedHouse);
     }
@@ -401,7 +420,7 @@ function buildPlanetDerivedDetails(planets: PlanetaryPosition[], cusps: HouseCus
     const occupiedHouse = houseByPlanet.get(planet.planet) ?? null;
     const starLordHouse = houseByPlanet.get(planet.starLord) ?? null;
     const subLordHouse = houseByPlanet.get(planet.subLord) ?? null;
-    const signLordHouse = findHouseByLord(cusps, planet.sign);
+    const signLordHouse = findHouseByLord(cusps, signLords[planet.sign]);
     const activationByHouse = Array.from({ length: 12 }, (_, index) => {
       const houseNumber = index + 1;
       return deriveRelationshipStrength(houseNumber, occupiedHouse, signLordHouse, starLordHouse, subLordHouse);
@@ -419,8 +438,8 @@ function buildPlanetDerivedDetails(planets: PlanetaryPosition[], cusps: HouseCus
   return details;
 }
 
-function findHouseByLord(cusps: HouseCusp[], sign: string): number | null {
-  const match = cusps.find((cusp) => cusp.sign === sign);
+function findHouseByLord(cusps: HouseCusp[], lord: string | undefined): number | null {
+  const match = cusps.find((cusp) => cusp.signLord === lord);
   return match?.house ?? null;
 }
 
@@ -473,49 +492,27 @@ function buildShortKPReading(position: PlanetaryPosition, derived: PlanetDerived
   ].join("; ");
 }
 
-function buildDashaRows(window: string, mahaDasha: string): DashaPeriodRow[] {
-  const match = window.match(/(\d{4})-(\d{2})\s+to\s+(\d{4})-(\d{2})/i);
-  if (!match) {
-    return [{ level: "Current", ruler: mahaDasha, window, focus: "Computed timing window from the active chart session." }];
-  }
-
-  const [, startYear, startMonth, endYear, endMonth] = match;
-  const start = new Date(Date.UTC(Number(startYear), Number(startMonth) - 1, 1));
-  const end = new Date(Date.UTC(Number(endYear), Number(endMonth) - 1, 1));
-  const totalMonths = Math.max(monthDiff(start, end), 1);
-  const segmentCount = Math.min(4, totalMonths);
-  const segmentMonths = Math.max(Math.ceil(totalMonths / segmentCount), 1);
-  const startIndex = Math.max(dashaPlanetOrder.indexOf(mahaDasha), 0);
-  const rows: DashaPeriodRow[] = [];
-
-  rows.push({
-    level: "Maha Dasha",
-    ruler: mahaDasha,
-    window,
-    focus: `${mahaDasha} remains the report anchor for this active computed period.`,
-  });
-
-  for (let index = 0; index < segmentCount; index += 1) {
-    const ruler = dashaPlanetOrder[(startIndex + index + 1) % dashaPlanetOrder.length];
-    const segmentStart = addMonths(start, segmentMonths * index);
-    const segmentEnd = index === segmentCount - 1 ? end : clampDate(addMonths(start, segmentMonths * (index + 1)), end);
-    rows.push({
-      level: `Bhukti ${index + 1}`,
-      ruler,
-      window: `${formatMonthYear(segmentStart)} to ${formatMonthYear(segmentEnd)}`,
-      focus: `${ruler} is used as the narrative focus for this computed sub-period.`,
-    });
-  }
-
-  return rows;
-}
-
-function addMonths(date: Date, months: number) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
-}
-
-function clampDate(date: Date, maxDate: Date) {
-  return date.getTime() > maxDate.getTime() ? maxDate : date;
+function buildDashaRows(dashaSummary: DashaSummary): DashaPeriodRow[] {
+  return [
+    {
+      level: "Maha Dasha",
+      ruler: dashaSummary.mahaDasha,
+      window: dashaSummary.window,
+      focus: `${dashaSummary.mahaDasha} sets the long-wave life agenda behind the current reading.`,
+    },
+    {
+      level: "Bhukti",
+      ruler: dashaSummary.bhukti,
+      window: dashaSummary.window,
+      focus: `${dashaSummary.bhukti} refines how the present period expresses the larger dasha promise.`,
+    },
+    {
+      level: "Antara",
+      ruler: dashaSummary.antara,
+      window: dashaSummary.window,
+      focus: `${dashaSummary.antara} acts as the immediate trigger layer for current-week interpretation.`,
+    },
+  ];
 }
 
 function getWeekWindow(date: Date) {
@@ -528,18 +525,6 @@ function getWeekWindow(date: Date) {
   end.setDate(start.getDate() + 6);
 
   return { start, end };
-}
-
-function monthDiff(start: Date, end: Date) {
-  return (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + (end.getUTCMonth() - start.getUTCMonth());
-}
-
-function formatMonthYear(date: Date) {
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
 }
 
 function formatLongDate(date: Date) {
@@ -564,6 +549,26 @@ function findPlanet(planets: PlanetaryPosition[], planetName: string) {
 
 function formatHouseRef(house: number | null) {
   return house == null ? "Pending" : `House ${house}`;
+}
+
+function buildTopicReadinessRows(cusps: HouseCusp[]) {
+  const configurations = [
+    { title: "Career", houses: [2, 6, 10, 11] },
+    { title: "Marriage", houses: [2, 7, 11] },
+    { title: "Finance", houses: [2, 6, 10, 11] },
+    { title: "Property", houses: [4, 11, 12] },
+  ];
+
+  return configurations.map((config) => {
+    const selectedCusps = config.houses
+      .map((house) => cusps[house - 1])
+      .filter((cusp): cusp is HouseCusp => Boolean(cusp));
+    const emphasis = selectedCusps.map((cusp) => `H${cusp.house}:${cusp.subLord}`).join(", ");
+    return {
+      title: `${config.title} readiness`,
+      detail: `Key sub-lord chain for houses ${config.houses.join(", ")} is ${emphasis}. Read these first when judging ${config.title.toLowerCase()} promise and timing.`,
+    };
+  });
 }
 
 function TableCard({ title, children }: { title: string; children: React.ReactNode }) {

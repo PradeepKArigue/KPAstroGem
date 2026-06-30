@@ -134,6 +134,77 @@ class DashaSegment:
     end: datetime
 
 
+@dataclass
+class ScoredSignificator:
+    planet: PlanetaryPosition
+    score: int
+    reasons: list[str]
+
+
+TOPIC_CONTEXT = {
+    "Career": {
+        "supporting": {2, 6, 10, 11},
+        "challenging": {5, 8, 12},
+        "promise": "sustained professional growth, responsibility, and visible gains",
+        "challenge": "delay, internal politics, or stop-start professional movement",
+    },
+    "Marriage": {
+        "supporting": {2, 7, 11},
+        "challenging": {1, 6, 8, 12},
+        "promise": "commitment, alliance, and formal relationship progress",
+        "challenge": "delay, mismatch, or emotional distance in commitment matters",
+    },
+    "Finance": {
+        "supporting": {2, 6, 10, 11},
+        "challenging": {8, 12},
+        "promise": "income stability, accumulation, and steady material growth",
+        "challenge": "leakage, debt pressure, or uneven accumulation",
+    },
+    "Foreign Settlement": {
+        "supporting": {3, 9, 12},
+        "challenging": {4, 8},
+        "promise": "movement, relocation, and overseas opportunity",
+        "challenge": "attachment to present circumstances or delay in travel settlement",
+    },
+    "Property": {
+        "supporting": {4, 11, 12},
+        "challenging": {6, 8},
+        "promise": "property progress, acquisition, or domestic stabilization",
+        "challenge": "procedural delay, dispute, or financing strain",
+    },
+    "Children": {
+        "supporting": {2, 5, 11},
+        "challenging": {1, 6, 8, 12},
+        "promise": "family growth, support, and fulfillment in child-related matters",
+        "challenge": "delay, caution, or additional patience around family growth",
+    },
+    "Business": {
+        "supporting": {2, 7, 10, 11},
+        "challenging": {6, 8, 12},
+        "promise": "commercial growth, partnership support, and business traction",
+        "challenge": "risk, volatility, or partner-side complications",
+    },
+    "Education": {
+        "supporting": {4, 5, 9, 11},
+        "challenging": {3, 8, 12},
+        "promise": "study continuity, guidance, and academic progress",
+        "challenge": "distraction, break, or slow academic consolidation",
+    },
+    "Health Caution": {
+        "supporting": {1, 5, 11},
+        "challenging": {6, 8, 12},
+        "promise": "recovery support, resilience, and better management",
+        "challenge": "fatigue, recurring strain, or the need for careful follow-up",
+    },
+    "Legal Caution": {
+        "supporting": {6, 10, 11},
+        "challenging": {7, 8, 12},
+        "promise": "structured resolution, compliance support, and procedural progress",
+        "challenge": "dispute extension, complication, or negotiation pressure",
+    },
+}
+
+
 def get_supported_question_topics() -> list[QuestionTopic]:
     return [
         QuestionTopic(
@@ -248,11 +319,21 @@ def build_chart(payload: ChartCalculationRequest) -> ChartData:
         ruler=ascendant.sub_lord,
         note="Derived from the computed first-house cusp subdivision used in KP reading.",
     )
+    tenth_cusp = house_cusps[9]
+    strongest_career = _rank_significators([_planet_to_model(planet) for planet in planets], house_cusps, [2, 6, 10, 11])[:2]
     interpretation = [
-            f"Lagna rises in {ascendant.sign} while the janma rasi is {moon.sign} in {moon.nakshatra} pada {moon.pada}.",
+        f"Lagna rises in {ascendant.sign} while the janma rasi is {moon.sign} in {moon.nakshatra} pada {moon.pada}.",
+        (
+            f"The 10th cusp falls in {tenth_cusp.sign} with star lord {tenth_cusp.star_lord} and sub lord {tenth_cusp.sub_lord}, "
+            "so professional matters are read through that chain in this chart."
+        ),
         (
             f"The active dasha chain as of {date.today().isoformat()} is "
             f"{dasha_summary.maha_dasha} / {dasha_summary.bhukti} / {dasha_summary.antara}."
+        ),
+        (
+            f"Current chart emphasis is strongest through {', '.join(item.planet.planet for item in strongest_career)} "
+            "for practical life-direction and visible results."
         ),
         "Astronomical positions, nakshatras, cusps, and Vimshottari sequencing are computed from the entered birth profile.",
     ]
@@ -280,13 +361,23 @@ def build_chart(payload: ChartCalculationRequest) -> ChartData:
 
 def build_question_answer(chart: ChartData, question: str, optional_date_range: str | None) -> ChartQuestionResponse:
     topic = _infer_topic(question, chart.birth_summary.question_category)
+    topic_context = TOPIC_CONTEXT.get(topic.name, TOPIC_CONTEXT["Career"])
     lagna_cusp = chart.house_cusps[0]
     relevant_cusps = [chart.house_cusps[house - 1] for house in topic.house_focus]
     dominant_cusp = relevant_cusps[0]
     moon = _find_planet_model(chart.planetary_positions, "Moon")
     antara_planet = _find_planet_model(chart.planetary_positions, chart.dasha_summary.antara)
-    linked_planets = _select_linked_planets(chart.planetary_positions, relevant_cusps)
+    scored_significators = _rank_significators(chart.planetary_positions, chart.house_cusps, topic.house_focus)
+    linked_planets = [item.planet for item in scored_significators[:3]]
+    active_dasha_lords = {
+        chart.dasha_summary.maha_dasha,
+        chart.dasha_summary.bhukti,
+        chart.dasha_summary.antara,
+    }
     current_week = _current_week_window()
+    support_house_hits = sum(1 for cusp in relevant_cusps if cusp.house in topic_context["supporting"])
+    challenge_house_hits = sum(1 for cusp in chart.house_cusps if cusp.house in topic_context["challenging"] and cusp.sub_lord in active_dasha_lords)
+    trend = "supportive" if support_house_hits >= challenge_house_hits else "mixed"
 
     cusp_sub_lord_analysis = [
         (
@@ -298,13 +389,17 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
             f"The leading cusp review starts from house {dominant_cusp.house}, where sign lord is {dominant_cusp.sign_lord}, "
             f"star lord is {dominant_cusp.star_lord}, and sub lord is {dominant_cusp.sub_lord}."
         ),
+        (
+            f"Within the running dasha chain, {chart.dasha_summary.maha_dasha}, {chart.dasha_summary.bhukti}, and "
+            f"{chart.dasha_summary.antara} are checked against these houses for event support or delay."
+        ),
     ]
     significator_analysis = [
         (
-            f"{planet.planet} becomes relevant through computed placement in {planet.sign}, "
-            f"{planet.nakshatra}, and sub lord {planet.sub_lord}."
+            f"{item.planet.planet} ranks strongly because it connects through {build_house_connection_summary(item.planet, chart.house_cusps)}. "
+            f"Its star lord is {item.planet.star_lord}, sub lord is {item.planet.sub_lord}, and KP weight score is {item.score}."
         )
-        for planet in linked_planets[:2]
+        for item in scored_significators[:2]
     ]
     if len(significator_analysis) < 2:
         significator_analysis.append(
@@ -324,6 +419,10 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
     ]
     supporting_factors = [
         (
+            f"The computed trend for this topic is {trend}, because the chart keeps returning the supporting houses "
+            f"{', '.join(str(house) for house in sorted(topic_context['supporting']))} in the active KP chain."
+        ),
+        (
             f"Relevant house lords cluster around {', '.join(sorted({cusp.star_lord for cusp in relevant_cusps}))} "
             "at the star-lord layer."
         ),
@@ -333,7 +432,11 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         ),
     ]
     blocking_factors = [
-        "Automated event-promise ranking is still lighter than a full human KP consultation with rectification.",
+        (
+            f"Challenging houses {', '.join(str(house) for house in sorted(topic_context['challenging']))} still need "
+            "to be watched because they can convert promise into delay if they dominate the sub-lord layer."
+        ),
+        "Automated event-promise ranking is stronger now, but still lighter than a full human KP consultation with rectification.",
         "Narrow timing beyond the active dasha chain should still be reviewed carefully against exact birth-time confidence.",
     ]
 
@@ -364,8 +467,16 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
             f"star lord {dominant_cusp.star_lord}, and sub lord {dominant_cusp.sub_lord}."
         ),
         (
+            f"The stronger promise side of the chart points toward {topic_context['promise']}, while the caution side points toward "
+            f"{topic_context['challenge']} if obstructing houses gain control."
+        ),
+        (
             f"The computed timing layer relies on the active dasha chain "
             f"{chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / {chart.dasha_summary.antara}."
+        ),
+        (
+            f"At present the reading leans {trend}, with {linked_planets[0].planet if linked_planets else moon.planet} carrying a strong part "
+            "of the active significator burden."
         ),
         "The automated answer should be read as a structured KP-style briefing, not as a substitute for a fully audited consultation.",
     ]
@@ -660,6 +771,75 @@ def _select_linked_planets(
     if linked:
         return linked
     return planetary_positions[:2]
+
+
+def _rank_significators(
+    planetary_positions: list[PlanetaryPosition], house_cusps: list[HouseCusp], relevant_houses: list[int]
+) -> list[ScoredSignificator]:
+    sign_lord_lookup = {planet.planet: _houses_with_lord(house_cusps, planet.planet, "sign") for planet in planetary_positions}
+    star_lord_lookup = {planet.planet: _houses_with_lord(house_cusps, planet.planet, "star") for planet in planetary_positions}
+    sub_lord_lookup = {planet.planet: _houses_with_lord(house_cusps, planet.planet, "sub") for planet in planetary_positions}
+    scored: list[ScoredSignificator] = []
+
+    for planet in planetary_positions:
+        score = 0
+        reasons: list[str] = []
+
+        if _extract_house_from_note(planet.note) in relevant_houses:
+            score += 5
+            reasons.append("occupies a target house")
+        if planet.planet in {house_cusps[house - 1].sign_lord for house in relevant_houses}:
+            score += 4
+            reasons.append("owns a target cusp")
+        if any(house in relevant_houses for house in star_lord_lookup.get(planet.planet, [])):
+            score += 3
+            reasons.append("connects through target star-lord houses")
+        if any(house in relevant_houses for house in sub_lord_lookup.get(planet.planet, [])):
+            score += 2
+            reasons.append("connects through target sub-lord houses")
+        if any(house in relevant_houses for house in sign_lord_lookup.get(planet.planet, [])):
+            score += 2
+            reasons.append("connects through target sign-lord houses")
+
+        scored.append(ScoredSignificator(planet=planet, score=score, reasons=reasons or ["general chart relevance"]))
+
+    return sorted(scored, key=lambda item: (-item.score, item.planet.planet))
+
+
+def _houses_with_lord(house_cusps: list[HouseCusp], lord: str, layer: str) -> list[int]:
+    results: list[int] = []
+    for cusp in house_cusps:
+        value = cusp.sign_lord if layer == "sign" else cusp.star_lord if layer == "star" else cusp.sub_lord
+        if value == lord:
+            results.append(cusp.house)
+    return results
+
+
+def _extract_house_from_note(note: str) -> int | None:
+    marker = "house "
+    lowered = note.lower()
+    if marker not in lowered:
+        return None
+    suffix = lowered.split(marker, 1)[1]
+    digits = "".join(character for character in suffix if character.isdigit())
+    return int(digits) if digits else None
+
+
+def build_house_connection_summary(planet: PlanetaryPosition, house_cusps: list[HouseCusp]) -> str:
+    occupied = _extract_house_from_note(planet.note)
+    sign_houses = _houses_with_lord(house_cusps, SIGN_LORDS[planet.sign], "sign")
+    star_houses = _houses_with_lord(house_cusps, planet.star_lord, "star")
+    sub_houses = _houses_with_lord(house_cusps, planet.sub_lord, "sub")
+    parts = []
+    if occupied is not None:
+        parts.append(f"occupation of house {occupied}")
+    if sign_houses:
+        parts.append(f"sign-lord houses {', '.join(str(house) for house in sign_houses[:2])}")
+    if star_houses:
+        parts.append(f"star-lord houses {', '.join(str(house) for house in star_houses[:2])}")
+    if sub_houses:
+        parts.append(f"sub-lord houses {', '.join(str(house) for house in sub_houses[:2])}")
+    return ", ".join(parts) if parts else "general planetary involvement"
 
 
 def _find_computed_planet(planets: list[ComputedPlanet], planet_name: str) -> ComputedPlanet:

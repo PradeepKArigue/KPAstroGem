@@ -236,6 +236,16 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
           <h2 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-semibold text-midnight">
             {answer.classifiedTopic} reading
           </h2>
+          <div className="mt-6 grid gap-3 lg:grid-cols-3">
+            <SessionBadge label="Topic" value={answer.classifiedTopic} />
+            <SessionBadge label="Timing window" value={answer.possibleTimingWindow} />
+            <SessionBadge label="Confidence" value={answer.confidenceLevel.level} />
+          </div>
+          <div className="mt-6 rounded-3xl bg-slate-50 p-5">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aurora/80">Reading summary</p>
+            <p className="mt-4 text-sm leading-7 text-midnight/75">{answer.interpretation[0]}</p>
+            <p className="mt-3 text-sm leading-7 text-midnight/70">{answer.interpretation[1]}</p>
+          </div>
           <div className="mt-6 grid gap-6 xl:grid-cols-2">
             <AnswerList title="Relevant houses" items={answer.relevantHouses.map((house) => `House ${house}`)} />
             <AnswerList title="Cusp sub lord analysis" items={answer.cuspSubLordAnalysis} />
