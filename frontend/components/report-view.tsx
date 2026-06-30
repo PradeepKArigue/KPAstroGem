@@ -47,6 +47,14 @@ type DashaPeriodRow = {
   focus: string;
 };
 
+type ActiveDashaGuide = {
+  title: string;
+  ruler: string;
+  window: string;
+  houseLinks: string;
+  meaning: string;
+};
+
 export function ReportView({ chartId }: { chartId: string }) {
   const [session, setSession] = useState<ChartSessionResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -98,6 +106,7 @@ export function ReportView({ chartId }: { chartId: string }) {
   const dashaRows = buildDashaRows(chartData.dashaSummary);
   const birthDashaRows = buildBirthDashaRows(chartData);
   const lifetimeDashaRows = buildLifetimeDashaRows(chartData.lifetimeDashaTimeline);
+  const activeDashaGuides = buildActiveDashaGuides(chartData.planetaryPositions, chartData.houseCusps, chartData.dashaSummary);
   const dashaNarrative = buildCurrentDashaNarrative(
     chartData.birthSummary,
     chartData.planetaryPositions,
@@ -205,6 +214,22 @@ export function ReportView({ chartId }: { chartId: string }) {
         </TableCard>
       </section>
 
+      <TableCard title="Current Maha, Bhukti, and Antara Reading">
+        <div className="grid gap-4 lg:grid-cols-3">
+          {activeDashaGuides.map((entry) => (
+            <div key={entry.title} className="rounded-3xl bg-slate-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-aurora/80">{entry.title}</p>
+              <p className="mt-2 font-[family-name:var(--font-heading)] text-3xl font-semibold text-midnight">{entry.ruler}</p>
+              <p className="mt-2 text-sm font-semibold text-midnight/70">{entry.window}</p>
+              <div className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm leading-7 text-midnight/70">
+                <span className="font-semibold text-midnight">KP links:</span> {entry.houseLinks}
+              </div>
+              <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm leading-7 text-midnight/70">{entry.meaning}</p>
+            </div>
+          ))}
+        </div>
+      </TableCard>
+
       <TableCard title="How To Read This KP Report">
         <div className="grid gap-3 lg:grid-cols-2">
           <ReadingStep
@@ -230,6 +255,35 @@ export function ReportView({ chartId }: { chartId: string }) {
           <ReadingStep
             title="Dasha windows explain timing"
             detail="The dasha reading now includes current-date and current-week framing. In a full KP engine, this should separate event promise from event timing."
+          />
+        </div>
+      </TableCard>
+
+      <TableCard title="KP Terms Made Clear">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <ReadingStep
+            title="Cusp"
+            detail="A cusp is the exact starting point of a house. In KP, the cusp matters more than the whole sign because prediction begins from the exact house edge."
+          />
+          <ReadingStep
+            title="Sign Lord"
+            detail="The sign lord is the planet ruling the sign where a planet or cusp falls. It shows the broad environment or background through which results will operate."
+          />
+          <ReadingStep
+            title="Star Lord"
+            detail="The star lord is the nakshatra ruler. In KP this is one of the strongest links because it shows which house results get activated more directly."
+          />
+          <ReadingStep
+            title="Sub Lord"
+            detail="The sub lord is the fine-grained KP division inside the nakshatra. It is often the deciding factor for whether a promise becomes favorable, delayed, or blocked."
+          />
+          <ReadingStep
+            title="Planet Reading"
+            detail="A planet is not read by sign alone. KP checks its occupied house, sign-lord links, star-lord links, and sub-lord links together before drawing a conclusion."
+          />
+          <ReadingStep
+            title="Dasha Judgment"
+            detail="Maha dasha shows the broad life period, bhukti narrows the active theme, and antara acts like the immediate trigger layer for current events and shorter timing."
           />
         </div>
       </TableCard>
@@ -605,6 +659,95 @@ function buildLifetimeDashaRows(entries: DashaTimelineEntry[]): string[][] {
     entry.quality,
     entry.focus,
   ]);
+}
+
+function buildActiveDashaGuides(
+  planets: PlanetaryPosition[],
+  cusps: HouseCusp[],
+  dashaSummary: DashaSummary,
+): ActiveDashaGuide[] {
+  return [
+    buildSingleDashaGuide("Maha Dasha", dashaSummary.mahaDasha, dashaSummary.mahaWindow, planets, cusps),
+    buildSingleDashaGuide("Bhukti", dashaSummary.bhukti, dashaSummary.bhuktiWindow, planets, cusps),
+    buildSingleDashaGuide("Antara", dashaSummary.antara, dashaSummary.antaraWindow, planets, cusps),
+  ];
+}
+
+function buildSingleDashaGuide(
+  title: string,
+  ruler: string,
+  window: string,
+  planets: PlanetaryPosition[],
+  cusps: HouseCusp[],
+): ActiveDashaGuide {
+  const planet = findPlanet(planets, ruler);
+  const occupiedHouse = deriveOccupiedHouse(planet, cusps);
+  const signLordHouses = findHousesByLord(cusps, signLords[planet.sign]);
+  const starLordHouses = findHousesByLord(cusps, planet.starLord);
+  const subLordHouses = findHousesByLord(cusps, planet.subLord);
+
+  const houseLinks = [
+    `${ruler} occupies ${formatHouseRef(occupiedHouse)}`,
+    `sign-lord path: ${formatHouseRefs(signLordHouses)}`,
+    `star-lord path: ${formatHouseRefs(starLordHouses)}`,
+    `sub-lord path: ${formatHouseRefs(subLordHouses)}`,
+  ].join(" | ");
+
+  const meaning = buildDashaMeaning(title, ruler, occupiedHouse, signLordHouses, starLordHouses, subLordHouses);
+
+  return {
+    title,
+    ruler,
+    window,
+    houseLinks,
+    meaning,
+  };
+}
+
+function deriveOccupiedHouse(planet: PlanetaryPosition, cusps: HouseCusp[]) {
+  return cusps.find((cusp) => cusp.sign === planet.sign)?.house ?? null;
+}
+
+function buildDashaMeaning(
+  title: string,
+  ruler: string,
+  occupiedHouse: number | null,
+  signLordHouses: number[],
+  starLordHouses: number[],
+  subLordHouses: number[],
+) {
+  const strongestHouse = occupiedHouse ?? signLordHouses[0] ?? starLordHouses[0] ?? subLordHouses[0] ?? null;
+  const houseMeaning = strongestHouse ? describeHouseMeaning(strongestHouse) : "general life development";
+  const triggerMeaning = subLordHouses[0] ? describeHouseMeaning(subLordHouses[0]) : houseMeaning;
+
+  if (title === "Maha Dasha") {
+    return `${ruler} sets the broad life chapter in this window. In KP terms it keeps pushing the native toward ${houseMeaning}, while the rest of the chart decides how strongly those results can materialize.`;
+  }
+
+  if (title === "Bhukti") {
+    return `${ruler} narrows the broad maha-dasha story into practical themes around ${houseMeaning}. This is the layer that usually tells us which part of life becomes more active inside the larger period.`;
+  }
+
+  return `${ruler} acts as the immediate trigger. In KP terms this antara is often the fast-moving layer that brings shorter events, emotional shifts, or visible movement through ${triggerMeaning}.`;
+}
+
+function describeHouseMeaning(house: number) {
+  const meanings: Record<number, string> = {
+    1: "self, vitality, confidence, and overall direction",
+    2: "family support, resources, earnings, and speech",
+    3: "initiative, effort, communication, and courage",
+    4: "education, home, emotional grounding, and inner comfort",
+    5: "intelligence, creativity, merit, and children",
+    6: "competition, effort under pressure, illness, debt, and service",
+    7: "partnership, public dealings, and agreements",
+    8: "sudden change, hidden pressure, vulnerability, and transformation",
+    9: "fortune, teachers, dharma, and higher guidance",
+    10: "profession, karma, work visibility, and achievement",
+    11: "gains, fulfillment, networks, and realization",
+    12: "loss, sleep, retreat, distance, and release",
+  };
+
+  return meanings[house] ?? "general life development";
 }
 
 function getWeekWindow(date: Date) {
