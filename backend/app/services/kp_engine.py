@@ -159,6 +159,17 @@ class ScoredSignificator:
     reasons: list[str]
 
 
+@dataclass
+class TopicEvaluation:
+    support_score: int
+    challenge_score: int
+    trend: str
+    supportive_cusp_links: list[str]
+    caution_cusp_links: list[str]
+    dasha_resonance: list[str]
+    obstruction_count: int
+
+
 TOPIC_CONTEXT = {
     "Career": {
         "supporting": {2, 6, 10, 11},
@@ -425,7 +436,16 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
     active_obstructions = [
         cusp for cusp in chart.house_cusps if cusp.house in topic_context["challenging"] and cusp.sub_lord in active_dasha_lords
     ]
-    trend = _derive_trend(support_score, challenge_score, len(active_obstructions))
+    evaluation = _evaluate_topic_rules(
+        chart.house_cusps,
+        relevant_cusps,
+        topic_context,
+        active_dasha_lords,
+        support_score,
+        challenge_score,
+        len(active_obstructions),
+    )
+    trend = evaluation.trend
     profession_signature = _describe_topic_signature(topic.name, linked_planets, dominant_cusp)
     age_context = _build_age_context(
         topic_name=topic.name,
@@ -494,8 +514,18 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
             f"against challenge score {challenge_score}."
         ),
         (
+            f"KP support is strongest through {', '.join(evaluation.supportive_cusp_links[:3])}."
+            if evaluation.supportive_cusp_links
+            else "No unusually strong cusp-support chain dominated this question, so the reading is leaning more on general significator strength."
+        ),
+        (
             f"Relevant house lords cluster around {', '.join(sorted({cusp.star_lord for cusp in relevant_cusps}))} "
             "at the star-lord layer."
+        ),
+        (
+            f"Current dasha resonance is visible through {', '.join(evaluation.dasha_resonance[:3])}."
+            if evaluation.dasha_resonance
+            else "The running dasha chain is only partially resonating with the main topic cusps, so timing should be treated with more caution."
         ),
         (
             f"The ascendant ruling pair {chart.star_lord.ruler} / {chart.sub_lord.ruler} keeps the question tied "
@@ -514,6 +544,11 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
             f"Challenging houses {', '.join(str(house) for house in sorted(topic_context['challenging']))} still need "
             f"to be watched because they can convert promise into delay if they dominate the sub-lord layer. "
             f"Current active obstruction count is {len(active_obstructions)}."
+        ),
+        (
+            f"Cautionary cusp chains are presently showing through {', '.join(evaluation.caution_cusp_links[:3])}."
+            if evaluation.caution_cusp_links
+            else "No single cautionary cusp chain is dominating strongly, but the obstructing houses still need monitoring."
         ),
         "Automated event-promise ranking is stronger now, but still lighter than a full human KP consultation with rectification.",
         "Narrow timing beyond the active dasha chain should still be reviewed carefully against exact birth-time confidence.",
@@ -565,6 +600,10 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
             f"{topic_context['challenge']} if obstructing houses gain control."
         ),
         (
+            f"Topic-rule review shows supportive cusp resonance through {', '.join(evaluation.supportive_cusp_links[:2]) or 'limited direct cusp resonance'}, "
+            f"while caution rises through {', '.join(evaluation.caution_cusp_links[:2]) or 'general obstructing-house pressure'}."
+        ),
+        (
             f"The computed timing layer relies on the active dasha chain "
             f"{chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / {chart.dasha_summary.antara}."
         ),
@@ -606,6 +645,13 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         CalculationTrailEntry(
             step="Life-stage projection",
             detail=str(minor_projection["trail_note"]) if minor_projection else "No extra life-stage projection was needed.",
+        ),
+        CalculationTrailEntry(
+            step="Rule evaluation",
+            detail=(
+                f"Support score {evaluation.support_score}, challenge score {evaluation.challenge_score}, "
+                f"trend {evaluation.trend}, obstruction count {evaluation.obstruction_count}."
+            ),
         ),
         CalculationTrailEntry(
             step="Cusp review",
@@ -993,6 +1039,47 @@ def _derive_trend(support_score: int, challenge_score: int, active_obstruction_c
     if adjusted_challenge > support_score:
         return "challenging"
     return "mixed"
+
+
+def _evaluate_topic_rules(
+    house_cusps: list[HouseCusp],
+    relevant_cusps: list[HouseCusp],
+    topic_context: dict[str, object],
+    active_dasha_lords: set[str],
+    support_score: int,
+    challenge_score: int,
+    obstruction_count: int,
+) -> TopicEvaluation:
+    supportive_houses = set(topic_context["supporting"])
+    challenging_houses = set(topic_context["challenging"])
+    supportive_cusp_links: list[str] = []
+    caution_cusp_links: list[str] = []
+    dasha_resonance: list[str] = []
+
+    for cusp in relevant_cusps:
+        chain = f"H{cusp.house} {cusp.sign_lord}/{cusp.star_lord}/{cusp.sub_lord}"
+        if cusp.house in supportive_houses:
+            supportive_cusp_links.append(chain)
+        if cusp.house in challenging_houses:
+            caution_cusp_links.append(chain)
+        if {cusp.sign_lord, cusp.star_lord, cusp.sub_lord} & active_dasha_lords:
+            dasha_resonance.append(chain)
+
+    for cusp in house_cusps:
+        chain = f"H{cusp.house} {cusp.sign_lord}/{cusp.star_lord}/{cusp.sub_lord}"
+        if cusp.house in challenging_houses and cusp.sub_lord in active_dasha_lords:
+            caution_cusp_links.append(chain)
+
+    trend = _derive_trend(support_score, challenge_score, obstruction_count)
+    return TopicEvaluation(
+        support_score=support_score,
+        challenge_score=challenge_score,
+        trend=trend,
+        supportive_cusp_links=_dedupe_preserve_order(supportive_cusp_links),
+        caution_cusp_links=_dedupe_preserve_order(caution_cusp_links),
+        dasha_resonance=_dedupe_preserve_order(dasha_resonance),
+        obstruction_count=obstruction_count,
+    )
 
 
 def _build_plain_explanation(
@@ -1511,6 +1598,17 @@ def _collect_house_links_for_lord(
 
 def _unique_house_list(houses: list[int]) -> list[int]:
     return sorted(set(house for house in houses if 1 <= house <= 12))
+
+
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
 
 
 def _format_house_theme_list(houses: list[int]) -> str:
