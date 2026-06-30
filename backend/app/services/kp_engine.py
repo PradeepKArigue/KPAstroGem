@@ -426,7 +426,7 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         cusp for cusp in chart.house_cusps if cusp.house in topic_context["challenging"] and cusp.sub_lord in active_dasha_lords
     ]
     trend = _derive_trend(support_score, challenge_score, len(active_obstructions))
-    profession_signature = _describe_profession_signature(linked_planets, dominant_cusp)
+    profession_signature = _describe_topic_signature(topic.name, linked_planets, dominant_cusp)
     age_context = _build_age_context(
         topic_name=topic.name,
         current_age=current_age,
@@ -640,17 +640,27 @@ def _infer_topic(question: str, fallback: str) -> QuestionTopic:
     topic_map = get_supported_question_topics()
 
     keyword_groups = {
-        "Career": ["career", "job", "promotion", "work", "profession"],
-        "Marriage": ["marriage", "married", "partner", "relationship"],
-        "Finance": ["finance", "money", "wealth", "income"],
-        "Foreign Settlement": ["foreign", "abroad", "relocation", "settlement", "overseas"],
-        "Property": ["property", "house", "real estate", "land"],
-        "Children": ["children", "child", "pregnancy", "family expansion"],
-        "Business": ["business", "startup", "partnership", "entrepreneur"],
-        "Education": ["study", "education", "college", "exam"],
-        "Health Caution": ["health", "recovery", "stress", "illness"],
-        "Legal Caution": ["legal", "court", "case", "litigation"],
+        "Career": ["career", "job", "promotion", "work", "profession", "professionally", "occupation", "employment"],
+        "Marriage": ["marriage", "married", "partner", "relationship", "spouse", "marital", "wedding"],
+        "Finance": ["finance", "financial", "money", "wealth", "income", "earning", "earnings", "savings", "rich", "prosperity"],
+        "Foreign Settlement": ["foreign", "abroad", "relocation", "settlement", "overseas", "onsite", "country", "travel abroad", "move abroad"],
+        "Property": ["property", "house", "home", "real estate", "land", "flat", "apartment", "buy house"],
+        "Children": ["children", "child", "pregnancy", "family expansion", "baby", "conceive", "kids"],
+        "Business": ["business", "startup", "partnership", "entrepreneur", "company", "trade", "self employment"],
+        "Education": ["study", "studies", "education", "school", "college", "exam", "subject", "stream", "learning", "academic"],
+        "Health Caution": ["health", "recovery", "stress", "illness", "medical", "disease", "eye", "vision", "sight", "eyesight"],
+        "Legal Caution": ["legal", "court", "case", "litigation", "dispute", "lawsuit", "law", "settlement case"],
     }
+
+    scores: dict[str, int] = {topic.name: 0 for topic in topic_map}
+    for topic_name, keywords in keyword_groups.items():
+        for keyword in keywords:
+            if keyword in normalized:
+                scores[topic_name] += max(1, len(keyword.split()))
+
+    best_topic = max(scores.items(), key=lambda item: item[1])
+    if best_topic[1] > 0:
+        return next(topic for topic in topic_map if topic.name == best_topic[0])
 
     for topic in topic_map:
         for keyword in keyword_groups.get(topic.name, []):
@@ -1048,6 +1058,8 @@ def _describe_concern(question: str, topic_name: str) -> str:
         return "For this career question, the app is reading the chart in KP style through houses 2, 6, 10, and 11, with special attention to profession promise, development stage, and realistic timing."
     if any(keyword in normalized for keyword in ["business", "finance", "money", "wealth"]):
         return "For this practical-life question, the app is reading the chart through future responsibility, skill-use, and the kind of life pattern the native may grow into."
+    if any(keyword in normalized for keyword in ["foreign", "abroad", "overseas", "relocation", "settlement"]):
+        return "For this foreign-settlement question, the app is reading the chart through movement houses, adaptability, and the longer-term possibility of living away from the birth environment."
     if topic_name == "Health Caution":
         return "For this health-related question, the chart should be read more as an early caution and management signal than as certainty."
     return f"For this {topic_name.lower()} question, the app is trying to summarize the chart in a more practical plain-language way."
@@ -1183,7 +1195,7 @@ def _build_minor_projection(
         return _build_minor_career_projection(chart, current_age, dominant_cusp, linked_planets, profession_signature)
     if topic_name == "Education":
         return _build_minor_education_projection(chart, current_age, dominant_cusp, profession_signature)
-    return None
+    return _build_general_minor_projection(chart, topic_name, current_age, dominant_cusp, profession_signature)
 
 
 def _build_minor_career_projection(
@@ -1272,6 +1284,93 @@ def _build_minor_education_projection(
         ],
         "trail_note": f"Projected education-stream window at age {stream_start_age}-{stream_end_age}.",
     }
+
+
+def _build_general_minor_projection(
+    chart: ChartData,
+    topic_name: str,
+    current_age: int,
+    dominant_cusp: HouseCusp,
+    topic_signature: str,
+) -> dict[str, str | list[str]]:
+    maturity_start_age, maturity_end_age = _minor_topic_maturity_window(topic_name)
+    maturity_window = _age_year_window(chart.birth_summary.date_of_birth, maturity_start_age, maturity_end_age)
+    topic_label = _minor_topic_label(topic_name)
+
+    if topic_name == "Health Caution":
+        plain_line = (
+            f"At this age the chart should be used mainly for monitoring, routine, resilience, and parental awareness. "
+            f"More independent self-management years begin around age {maturity_start_age} to {maturity_end_age} ({maturity_window}), "
+            f"and the present health-support signature leans toward {topic_signature}."
+        )
+        interpretation_line = (
+            f"KP child-health judgment: house {dominant_cusp.house} with {dominant_cusp.sign_lord}/{dominant_cusp.star_lord}/{dominant_cusp.sub_lord} "
+            f"should be used to track sensitivity, recovery support, and manageable caution points rather than adult-disease language."
+        )
+        support_line = (
+            "The answer is being reframed with child-health logic, so the chart is being read for resilience, care pattern, and follow-up discipline."
+        )
+        dasha_lines = [
+            f"The native is currently {current_age} years old, so health timing is being read for routine, monitoring, and developmental care rather than adult burden.",
+            f"Age {maturity_start_age} to {maturity_end_age} ({maturity_window}) is a better window for judging how strongly self-management habits and resilience develop.",
+            *_build_minor_topic_yearly_outlook(topic_name, current_age),
+        ]
+        trail_note = f"Projected child-health self-management window at age {maturity_start_age}-{maturity_end_age}."
+    else:
+        plain_line = (
+            f"Because the native is still a minor, this question should be read first through {topic_label}, family environment, and gradual maturity. "
+            f"The stronger years for literal {topic_name.lower()} judgment are around age {maturity_start_age} to {maturity_end_age} ({maturity_window}), "
+            f"and the current long-range signature leans toward {topic_signature}."
+        )
+        interpretation_line = (
+            f"KP age-stage judgment for {topic_name.lower()}: house {dominant_cusp.house} with {dominant_cusp.sign_lord}/{dominant_cusp.star_lord}/{dominant_cusp.sub_lord} "
+            f"should first be read for pattern-building and later maturity. More literal event judgment becomes meaningful around age {maturity_start_age}-{maturity_end_age}."
+        )
+        support_line = (
+            f"The answer is being adjusted for age reality, so current years are being read for {topic_label} rather than literal adult-event timing."
+        )
+        dasha_lines = [
+            f"The native is currently {current_age} years old, so this {topic_name.lower()} question is being read through child-to-young-adult development rather than immediate adult timing.",
+            f"Age {maturity_start_age} to {maturity_end_age} ({maturity_window}) is the stronger band for more literal {topic_name.lower()} judgment in this chart.",
+            *_build_minor_topic_yearly_outlook(topic_name, current_age),
+        ]
+        trail_note = f"Projected maturity window for {topic_name.lower()} at age {maturity_start_age}-{maturity_end_age}."
+
+    return {
+        "plain_line": plain_line,
+        "interpretation_line": interpretation_line,
+        "support_line": support_line,
+        "dasha_lines": dasha_lines,
+        "trail_note": trail_note,
+    }
+
+
+def _minor_topic_maturity_window(topic_name: str) -> tuple[int, int]:
+    mapping = {
+        "Marriage": (23, 30),
+        "Finance": (22, 30),
+        "Foreign Settlement": (21, 29),
+        "Property": (25, 35),
+        "Children": (25, 34),
+        "Business": (23, 32),
+        "Legal Caution": (18, 25),
+        "Health Caution": (15, 20),
+    }
+    return mapping.get(topic_name, (18, 24))
+
+
+def _minor_topic_label(topic_name: str) -> str:
+    mapping = {
+        "Marriage": "emotional maturity and future relationship pattern",
+        "Finance": "money habits, resource attitude, and later earning pattern",
+        "Foreign Settlement": "adaptability, travel tendency, and later relocation potential",
+        "Property": "family stability, domestic support, and future settlement tendency",
+        "Children": "nurturing tendency, family values, and future parenting pattern",
+        "Business": "initiative, independence, and future enterprise tendency",
+        "Legal Caution": "responsibility, discipline, and conflict-handling pattern",
+        "Health Caution": "care routine and resilience pattern",
+    }
+    return mapping.get(topic_name, "future maturity pattern")
 
 
 def _training_year_span(profession_signature: str) -> int:
@@ -1492,17 +1591,17 @@ def _build_ruler_remedies(lord: str, caution_houses: list[int]) -> list[str]:
     return remedies
 
 
-def _describe_profession_signature(linked_planets: list[PlanetaryPosition], dominant_cusp: HouseCusp) -> str:
+def _describe_topic_signature(topic_name: str, linked_planets: list[PlanetaryPosition], dominant_cusp: HouseCusp) -> str:
     domain_scores: dict[str, int] = {}
     source_planets = [planet.planet for planet in linked_planets[:3]]
     source_planets.extend([dominant_cusp.sign_lord, dominant_cusp.star_lord, dominant_cusp.sub_lord])
 
     for planet_name in source_planets:
-        for domain in _planet_career_domains(planet_name):
+        for domain in _planet_topic_domains(topic_name, planet_name):
             domain_scores[domain] = domain_scores.get(domain, 0) + 1
 
     if not domain_scores:
-        return "general professional development and skill-building roles"
+        return _default_topic_signature(topic_name)
 
     ranked_domains = sorted(domain_scores.items(), key=lambda item: (-item[1], item[0]))
     top_domains = [domain for domain, _ in ranked_domains[:3]]
@@ -1511,6 +1610,104 @@ def _describe_profession_signature(linked_planets: list[PlanetaryPosition], domi
     if len(top_domains) == 2:
         return f"{top_domains[0]} and {top_domains[1]}"
     return f"{top_domains[0]}, {top_domains[1]}, and {top_domains[2]}"
+
+
+def _planet_topic_domains(topic_name: str, planet_name: str) -> list[str]:
+    if topic_name in {"Career", "Education"}:
+        return _planet_career_domains(planet_name)
+
+    topic_mapping = {
+        "Health Caution": {
+            "Sun": ["vitality awareness and disciplined routine"],
+            "Moon": ["care, nourishment, and emotional steadiness"],
+            "Mars": ["heat, inflammation caution, and physical responsiveness"],
+            "Mercury": ["nervous-system sensitivity, observation, and practical follow-up"],
+            "Jupiter": ["recovery support and guidance-led care"],
+            "Venus": ["comfort balance, hormonal harmony, and restorative support"],
+            "Saturn": ["chronic-pattern caution, discipline, and structured management"],
+            "Rahu": ["allergy-like sensitivity, irregular triggers, and careful monitoring"],
+            "Ketu": ["subtle sensitivity, specialist review, and hidden-pattern observation"],
+        },
+        "Finance": {
+            "Sun": ["status-linked earnings and visible responsibility"],
+            "Moon": ["family support, flow of resources, and responsive earning pattern"],
+            "Mars": ["effort-based income and action-led earning"],
+            "Mercury": ["trade, analytics, communication, and flexible money skill"],
+            "Jupiter": ["wealth building, guidance, and long-term financial growth"],
+            "Venus": ["comfort, luxury, design, and value attraction"],
+            "Saturn": ["disciplined saving, structure, and slow accumulation"],
+            "Rahu": ["modern markets, unconventional income, and foreign-linked gains"],
+            "Ketu": ["selective spending, detachment, and specialist skill income"],
+        },
+        "Foreign Settlement": {
+            "Sun": ["status-linked relocation and purposeful travel"],
+            "Moon": ["emotional adaptability and movement with support systems"],
+            "Mars": ["migration through effort, initiative, and relocation drive"],
+            "Mercury": ["study travel, communication-led movement, and flexible relocation"],
+            "Jupiter": ["higher-study travel, guidance, and long-distance opportunity"],
+            "Venus": ["comfortable relocation and lifestyle-driven settlement"],
+            "Saturn": ["delayed but steady settlement through persistence"],
+            "Rahu": ["foreign-linked movement, nontraditional settlement, and cross-border pull"],
+            "Ketu": ["detachment from birthplace and specialist travel patterns"],
+        },
+        "Marriage": {
+            "Sun": ["visible commitment and dignity in relationships"],
+            "Moon": ["emotional bonding and caring partnership style"],
+            "Mars": ["passion, directness, and adjustment lessons in bonding"],
+            "Mercury": ["communication-based matching and practical understanding"],
+            "Jupiter": ["guidance, dharmic support, and formal alliance"],
+            "Venus": ["affection, attraction, harmony, and companionship"],
+            "Saturn": ["delayed but serious commitment and long-term responsibility"],
+            "Rahu": ["unconventional attraction and karmic intensity in relationships"],
+            "Ketu": ["distance, detachment, or inwardness in bonding patterns"],
+        },
+        "Property": {
+            "Sun": ["status-linked property and visible asset building"],
+            "Moon": ["home comfort, domestic grounding, and family residence"],
+            "Mars": ["land, construction, and physical asset action"],
+            "Mercury": ["documentation, transactions, and flexible property decisions"],
+            "Jupiter": ["family expansion, blessing, and stable settlement"],
+            "Venus": ["beautiful home, comfort, and lifestyle property"],
+            "Saturn": ["slow accumulation, durable assets, and structured settlement"],
+            "Rahu": ["modern assets, unusual locations, and nontraditional settlement"],
+            "Ketu": ["detached or minimalist property pattern"],
+        },
+        "Children": {
+            "Sun": ["guidance, pride, and visible legacy through children"],
+            "Moon": ["nurturing, emotional bonding, and caregiving"],
+            "Mars": ["active children, effort, and protective instinct"],
+            "Mercury": ["learning, communication, and developmental pattern"],
+            "Jupiter": ["fertility blessing, growth, and mentoring support"],
+            "Venus": ["affection, bonding, and joy through family growth"],
+            "Saturn": ["delay, patience, and responsibility in family expansion"],
+            "Rahu": ["unusual timing or unconventional family pattern"],
+            "Ketu": ["detachment, karmic lessons, or subtle family themes"],
+        },
+        "Business": {
+            "Sun": ["leadership, ownership, and visible authority"],
+            "Moon": ["public dealing, customer response, and adaptive trade"],
+            "Mars": ["enterprise drive, execution, and commercial risk-taking"],
+            "Mercury": ["trade, negotiation, analytics, and commercial intelligence"],
+            "Jupiter": ["advisory business, trust, and long-view expansion"],
+            "Venus": ["brand value, design, presentation, and customer appeal"],
+            "Saturn": ["systems, discipline, and long-cycle business building"],
+            "Rahu": ["modern platforms, scaling, and unconventional enterprise"],
+            "Ketu": ["specialist niche, back-end focus, and selective enterprise"],
+        },
+        "Legal Caution": {
+            "Sun": ["authority, compliance, and formal process"],
+            "Moon": ["emotional response to dispute and need for stability"],
+            "Mars": ["conflict drive, argument, and procedural pressure"],
+            "Mercury": ["documents, negotiation, and legal communication"],
+            "Jupiter": ["fair guidance, counsel, and protective support"],
+            "Venus": ["settlement, compromise, and relationship-based resolution"],
+            "Saturn": ["delay, structure, and formal burden"],
+            "Rahu": ["complexity, unusual entanglement, and procedural uncertainty"],
+            "Ketu": ["detached outcome, technicality, and hidden complication"],
+        },
+    }
+    topic_domains = topic_mapping.get(topic_name, {})
+    return topic_domains.get(planet_name, [_default_topic_signature(topic_name)])
 
 
 def _planet_career_domains(planet_name: str) -> list[str]:
@@ -1526,6 +1723,22 @@ def _planet_career_domains(planet_name: str) -> list[str]:
         "Ketu": ["research, diagnostics, specialist, and deep-focus work"],
     }
     return mapping.get(planet_name, ["general professional development and skill-building roles"])
+
+
+def _default_topic_signature(topic_name: str) -> str:
+    defaults = {
+        "Career": "general professional development and skill-building roles",
+        "Education": "general academic growth and aptitude formation",
+        "Health Caution": "general resilience, monitoring, and supportive care pattern",
+        "Finance": "general resource building and financial maturity",
+        "Foreign Settlement": "general relocation potential and adaptability",
+        "Marriage": "general relationship maturity and commitment pattern",
+        "Property": "general settlement tendency and domestic stability",
+        "Children": "general family growth and nurturing pattern",
+        "Business": "general enterprise tendency and commercial growth",
+        "Legal Caution": "general compliance, negotiation, and conflict-handling pattern",
+    }
+    return defaults.get(topic_name, "general life-pattern development")
 
 
 def _build_minor_topic_yearly_outlook(topic_name: str, current_age: int) -> list[str]:
