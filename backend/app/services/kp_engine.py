@@ -387,8 +387,12 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         cusp for cusp in chart.house_cusps if cusp.house in topic_context["challenging"] and cusp.sub_lord in active_dasha_lords
     ]
     trend = _derive_trend(support_score, challenge_score, len(active_obstructions))
-    is_minor_career_question = topic.name == "Career" and current_age < 18
     profession_signature = _describe_profession_signature(linked_planets, dominant_cusp)
+    age_context = _build_age_context(
+        topic_name=topic.name,
+        current_age=current_age,
+        profession_signature=profession_signature,
+    )
 
     cusp_sub_lord_analysis = [
         (
@@ -428,15 +432,11 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         ),
         f"Timing emphasis is being framed around {optional_date_range or chart.dasha_summary.window}.",
     ]
-    if is_minor_career_question:
+    if age_context["is_minor"]:
         dasha_support = [
-            (
-                f"The native is currently {current_age} years old, so this career question is being read as a future profession and development question, not as immediate job-entry timing."
-            ),
-            (
-                f"Professional inclination currently leans toward {profession_signature} when the chart is read through house {dominant_cusp.house} and the stronger significators."
-            ),
-            *_build_minor_career_yearly_outlook(current_age),
+            str(age_context["timing_intro"]),
+            str(age_context["direction_line"]).format(house=dominant_cusp.house, profession=profession_signature),
+            *_build_minor_topic_yearly_outlook(topic.name, current_age),
         ]
     supporting_factors = [
         (
@@ -453,12 +453,10 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
             "to the computed birth profile rather than a generic template."
         ),
     ]
-    if is_minor_career_question:
+    if age_context["is_minor"]:
         supporting_factors.insert(
             0,
-            (
-                f"Age-aware chart reading is active here, so the app is prioritizing aptitude, stream formation, and future career direction over present-day employment events."
-            ),
+            str(age_context["support_line"]),
         )
     blocking_factors = [
         (
@@ -481,7 +479,7 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         timing_window=optional_date_range or chart.dasha_summary.window,
         current_age=current_age,
         profession_signature=profession_signature,
-        is_minor_career_question=is_minor_career_question,
+        age_context=age_context,
     )
 
     caution_disclaimer = (
@@ -524,16 +522,14 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         ),
         "The automated answer should be read as a structured KP-style briefing, not as a substitute for a fully audited consultation.",
     ]
-    if is_minor_career_question:
+    if age_context["is_minor"]:
         interpretation.insert(
             2,
-            (
-                f"Because the native is currently {current_age} years old, this should be read for future profession direction rather than immediate job timing."
-            ),
+            str(age_context["interpretation_intro"]),
         )
         interpretation.insert(
             3,
-            f"The chart's present profession signature leans toward {profession_signature}.",
+            str(age_context["interpretation_direction"]).format(profession=profession_signature),
         )
     confidence = ConfidenceLevel(
         level="medium",
@@ -551,9 +547,7 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         ),
         CalculationTrailEntry(
             step="Age context",
-            detail=(
-                f"Computed current age as {current_age}. {'Applied child-career reframing logic.' if is_minor_career_question else 'No child-career reframing was needed.'}"
-            ),
+            detail=f"Computed current age as {current_age}. {age_context['trail_note']}",
         ),
         CalculationTrailEntry(
             step="Cusp review",
@@ -860,16 +854,15 @@ def _build_plain_explanation(
     timing_window: str,
     current_age: int,
     profession_signature: str,
-    is_minor_career_question: bool,
+    age_context: dict[str, str | bool],
 ) -> str:
     concern = _describe_concern(question, topic_name)
     lead_planet = linked_planets[0].planet if linked_planets else moon.planet
     trend_phrase = _describe_trend_phrase(topic_name, trend, topic_context)
-    if is_minor_career_question:
+    if age_context["is_minor"]:
         timing_phrase = (
-            f"Because the native is currently {current_age} years old, this should not be read as current job timing. "
-            f"Instead, the chart is being read for future profession direction, development years, and eventual entry into working life. "
-            f"The strongest immediate timing focus stays at {timing_window}, but for career matters it should be treated as a formative period rather than a literal employment window."
+            f"{age_context['plain_timing_intro']} "
+            f"The strongest immediate timing focus stays at {timing_window}, but for {topic_name.lower()} matters it should be treated as a formative or preparatory period rather than a literal adult-event window."
         )
     else:
         timing_phrase = (
@@ -885,8 +878,8 @@ def _build_plain_explanation(
         f"Right now, {lead_planet} is carrying an important part of the active significator load for this question."
     )
     profession_phrase = (
-        f"The longer-term professional signature currently leans toward {profession_signature}."
-        if is_minor_career_question
+        str(age_context["plain_direction"]).format(profession=profession_signature)
+        if age_context["is_minor"]
         else ""
     )
 
@@ -899,10 +892,14 @@ def _describe_concern(question: str, topic_name: str) -> str:
     normalized = question.lower()
     if any(keyword in normalized for keyword in ["eye", "eyes", "vision", "sight", "eyesight"]):
         return "For the specific concern of eye health, the chart does not currently read like a severe danger signal."
+    if "education" in normalized or "study" in normalized or "school" in normalized:
+        return "For this education question, the app is reading the chart through learning growth, aptitude formation, and subject-direction signals."
     if any(keyword in normalized for keyword in ["marriage", "partner", "relationship"]):
         return "For this relationship question, the app is reading the chart as a question of commitment timing and emotional stability."
     if any(keyword in normalized for keyword in ["job", "career", "promotion", "work"]):
         return "For this career question, the app is reading the chart mainly through progress, stability, and timing of opportunity."
+    if any(keyword in normalized for keyword in ["business", "finance", "money", "wealth"]):
+        return "For this practical-life question, the app is reading the chart through future responsibility, skill-use, and the kind of life pattern the native may grow into."
     if topic_name == "Health Caution":
         return "For this health-related question, the chart should be read more as an early caution and management signal than as certainty."
     return f"For this {topic_name.lower()} question, the app is trying to summarize the chart in a more practical plain-language way."
@@ -935,6 +932,91 @@ def _current_age(date_of_birth: str, as_of: date | None = None) -> int:
     if (today.month, today.day) < (birth_date.month, birth_date.day):
         years -= 1
     return max(years, 0)
+
+
+def _build_age_context(topic_name: str, current_age: int, profession_signature: str) -> dict[str, str | bool]:
+    if current_age >= 18:
+        return {
+            "is_minor": False,
+            "timing_intro": "",
+            "direction_line": "",
+            "support_line": "",
+            "interpretation_intro": "",
+            "interpretation_direction": "",
+            "trail_note": "No child-age reframing was needed.",
+            "plain_timing_intro": "",
+            "plain_direction": "",
+        }
+
+    if topic_name == "Career":
+        return {
+            "is_minor": True,
+            "timing_intro": f"The native is currently {current_age} years old, so this career question is being read as a future profession and development question, not as immediate job-entry timing.",
+            "direction_line": "Professional inclination currently leans toward {profession} when the chart is read through house {house} and the stronger significators.",
+            "support_line": "Age-aware chart reading is active here, so the app is prioritizing aptitude, stream formation, and future career direction over present-day employment events.",
+            "interpretation_intro": f"Because the native is currently {current_age} years old, this should be read for future profession direction rather than immediate job timing.",
+            "interpretation_direction": "The chart's present profession signature leans toward {profession}.",
+            "trail_note": "Applied child-career reframing logic.",
+            "plain_timing_intro": f"Because the native is currently {current_age} years old, this should not be read as current job timing. Instead, the chart is being read for future profession direction, development years, and eventual entry into working life.",
+            "plain_direction": "The longer-term professional signature currently leans toward {profession}.",
+        }
+
+    if topic_name == "Education":
+        return {
+            "is_minor": True,
+            "timing_intro": f"The native is currently {current_age} years old, so this education question is being read through school growth, learning style, and future stream direction.",
+            "direction_line": "Educational inclination currently leans toward {profession} when the chart is read through house {house} and the stronger significators.",
+            "support_line": "Age-aware chart reading is active here, so the app is prioritizing learning pattern, subject affinity, discipline, and stream choice over adult outcome language.",
+            "interpretation_intro": f"Because the native is currently {current_age} years old, this should be read for academic development, subject direction, and later stream selection.",
+            "interpretation_direction": "The present educational signature leans toward {profession}.",
+            "trail_note": "Applied child-education reframing logic.",
+            "plain_timing_intro": f"Because the native is currently {current_age} years old, this should be read as an education-development question rather than as a final adult-result question.",
+            "plain_direction": "The longer-term educational and aptitude signature currently leans toward {profession}.",
+        }
+
+    if topic_name in {"Marriage", "Business", "Finance", "Legal Caution"}:
+        label = {
+            "Marriage": "future relationship and maturity",
+            "Business": "future commercial aptitude and independence",
+            "Finance": "future money-management and earning pattern",
+            "Legal Caution": "future responsibility and conflict-handling pattern",
+        }[topic_name]
+        return {
+            "is_minor": True,
+            "timing_intro": f"The native is currently {current_age} years old, so this {topic_name.lower()} question is being reframed through {label} rather than immediate adult-event timing.",
+            "direction_line": "The chart is being read through house {house} for future pattern-building, with a longer-term inclination toward {profession}.",
+            "support_line": f"Age-aware chart reading is active here, so the app is avoiding literal adult-event timing and instead focusing on future life-pattern indicators for {topic_name.lower()}.",
+            "interpretation_intro": f"Because the native is currently {current_age} years old, this should be read for future pattern and maturity rather than present adult-event timing.",
+            "interpretation_direction": "The longer-term directional signature currently leans toward {profession}.",
+            "trail_note": f"Applied child-{topic_name.lower().replace(' ', '-') } reframing logic.",
+            "plain_timing_intro": f"Because the native is currently {current_age} years old, this should not be read as an immediate adult-event question. Instead, the chart is being read for future tendency, maturity pattern, and later-life expression.",
+            "plain_direction": "The longer-term life-pattern signature currently leans toward {profession}.",
+        }
+
+    if topic_name == "Health Caution":
+        return {
+            "is_minor": True,
+            "timing_intro": f"The native is currently {current_age} years old, so this health question is being read with child-development and care context, not adult health-burden language.",
+            "direction_line": "The chart is being read through house {house} for recovery support, sensitivity points, and the kind of care pattern that may help, with a supporting signature around {profession}.",
+            "support_line": "Age-aware chart reading is active here, so the app is prioritizing resilience, care, monitoring, and developmental sensitivity over adult-disease framing.",
+            "interpretation_intro": f"Because the native is currently {current_age} years old, this should be read with child-health caution, monitoring, and recovery context.",
+            "interpretation_direction": "The longer-term support signature currently leans toward {profession}.",
+            "trail_note": "Applied child-health reframing logic.",
+            "plain_timing_intro": f"Because the native is currently {current_age} years old, this should be read through monitoring, care, resilience, and developmental sensitivity rather than heavy adult health language.",
+            "plain_direction": "",
+        }
+
+    return {
+        "is_minor": False,
+        "timing_intro": "",
+        "direction_line": "",
+        "support_line": "",
+        "interpretation_intro": "",
+        "interpretation_direction": "",
+        "trail_note": "No child-age reframing was needed.",
+        "plain_timing_intro": "",
+        "plain_direction": "",
+    }
 
 
 def _describe_profession_signature(linked_planets: list[PlanetaryPosition], dominant_cusp: HouseCusp) -> str:
@@ -973,26 +1055,60 @@ def _planet_career_domains(planet_name: str) -> list[str]:
     return mapping.get(planet_name, ["general professional development and skill-building roles"])
 
 
-def _build_minor_career_yearly_outlook(current_age: int) -> list[str]:
+def _build_minor_topic_yearly_outlook(topic_name: str, current_age: int) -> list[str]:
     current_year = date.today().year
     outlook: list[str] = []
 
     for offset, age in enumerate(range(current_age, min(19, current_age + 7))):
         start_year = current_year + offset
         end_year = start_year + 1
-        if age <= 11:
-            note = "This year should be read for learning foundation, curiosity, confidence, and early interests rather than profession selection."
-        elif age <= 13:
-            note = "This year should be read for skill formation, communication patterns, and the subjects or activities that begin to stand out."
-        elif age <= 15:
-            note = "This year should be read for stronger aptitude sorting, discipline, and clues about preferred academic or creative direction."
-        elif age <= 17:
-            note = "This year should be read for stream choice, exam direction, coaching, and more visible hints about future profession type."
-        else:
-            note = "This year begins to matter more seriously for course specialization, preparation, and eventual profession-entry direction."
+        note = _minor_outlook_note(topic_name, age)
         outlook.append(f"Age {age} ({start_year}-{end_year}): {note}")
 
     return outlook
+
+
+def _minor_outlook_note(topic_name: str, age: int) -> str:
+    if topic_name == "Education":
+        if age <= 11:
+            return "This year should be read for learning comfort, foundational confidence, and noticing what subjects naturally attract the child."
+        if age <= 13:
+            return "This year should be read for skill formation, communication style, memory habits, and early subject preference."
+        if age <= 15:
+            return "This year should be read for aptitude sorting, study discipline, and clearer stream direction."
+        if age <= 17:
+            return "This year should be read for stream choice, exam orientation, mentoring, and stronger academic direction."
+        return "This year begins to matter for specialization and the academic path that can influence profession later."
+
+    if topic_name == "Health Caution":
+        if age <= 11:
+            return "This year should be read for monitoring, parental care, routine, recovery support, and noticing recurring sensitivities early."
+        if age <= 13:
+            return "This year should be read for building healthy habits, regular follow-up, and preventing small recurring issues from becoming patterns."
+        if age <= 15:
+            return "This year should be read for stronger self-awareness, practical management, and consistent care discipline."
+        return "This year should be read for maturing resilience, responsibility, and better self-management of health sensitivities."
+
+    if topic_name in {"Marriage", "Business", "Finance", "Legal Caution"}:
+        if age <= 11:
+            return "This year should be read for temperament, values, confidence, and the basic personality traits that later influence adult life outcomes."
+        if age <= 13:
+            return "This year should be read for communication style, responsibility habits, and the way the child responds to structure and guidance."
+        if age <= 15:
+            return "This year should be read for maturity, judgment, discipline, and early independent decision patterns."
+        if age <= 17:
+            return "This year should be read for responsibility, social maturity, and the habits that will shape later adult outcomes."
+        return "This year begins to matter more directly for later adult pattern formation."
+
+    if age <= 11:
+        return "This year should be read for learning foundation, curiosity, confidence, and early interests rather than profession selection."
+    if age <= 13:
+        return "This year should be read for skill formation, communication patterns, and the subjects or activities that begin to stand out."
+    if age <= 15:
+        return "This year should be read for stronger aptitude sorting, discipline, and clues about preferred academic or creative direction."
+    if age <= 17:
+        return "This year should be read for stream choice, exam direction, coaching, and more visible hints about future profession type."
+    return "This year begins to matter more seriously for course specialization, preparation, and eventual profession-entry direction."
 
 
 def _rank_significators(
