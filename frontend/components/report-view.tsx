@@ -641,6 +641,10 @@ function QuestionHistoryCard({ item }: { item: ChartQuestionResponse }) {
     <div className="rounded-3xl bg-slate-50 p-5">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-aurora/80">Question</p>
       <p className="mt-2 font-semibold text-midnight">{item.question}</p>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-midnight/60">Plain-language reading</p>
+      <div className="mt-3 rounded-2xl bg-white px-4 py-3 text-sm leading-7 text-midnight/70">
+        {item.plainExplanation}
+      </div>
       <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-midnight/60">KP-style answer</p>
       <ul className="mt-3 space-y-2">
         {item.interpretation.map((line) => (

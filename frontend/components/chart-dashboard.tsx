@@ -240,7 +240,9 @@ export function ChartDashboard({ chartId }: { chartId: string }) {
                   <div key={`${item.question}-${index}`} className="rounded-2xl bg-white p-4">
                     <p className="font-semibold text-midnight">{item.question}</p>
                     <p className="mt-2 text-sm text-midnight/70">Topic: {item.classifiedTopic}</p>
-                    <p className="mt-2 text-sm leading-6 text-midnight/60">{item.interpretation[0]}</p>
+                    <p className="mt-2 text-sm leading-6 text-midnight/60">
+                      {item.plainExplanation || item.interpretation[0]}
+                    </p>
                   </div>
                 ))}
               </div>

@@ -449,6 +449,17 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
         "Automated event-promise ranking is stronger now, but still lighter than a full human KP consultation with rectification.",
         "Narrow timing beyond the active dasha chain should still be reviewed carefully against exact birth-time confidence.",
     ]
+    plain_explanation = _build_plain_explanation(
+        chart=chart,
+        question=question,
+        topic_name=topic.name,
+        trend=trend,
+        dominant_cusp=dominant_cusp,
+        moon=moon,
+        topic_context=topic_context,
+        linked_planets=linked_planets,
+        timing_window=optional_date_range or chart.dasha_summary.window,
+    )
 
     caution_disclaimer = (
         "This response is an automated KP-style interpretation and should be treated as decision support, not certainty."
@@ -517,6 +528,7 @@ def build_question_answer(chart: ChartData, question: str, optional_date_range: 
     return ChartQuestionResponse(
         question=question,
         classifiedTopic=topic.name,
+        plainExplanation=plain_explanation,
         relevantHouses=topic.house_focus,
         cuspSubLordAnalysis=cusp_sub_lord_analysis,
         significatorAnalysis=significator_analysis,
@@ -793,6 +805,70 @@ def _derive_trend(support_score: int, challenge_score: int, active_obstruction_c
     if adjusted_challenge > support_score:
         return "challenging"
     return "mixed"
+
+
+def _build_plain_explanation(
+    *,
+    chart: ChartData,
+    question: str,
+    topic_name: str,
+    trend: str,
+    dominant_cusp: HouseCusp,
+    moon: PlanetaryPosition,
+    topic_context: dict[str, object],
+    linked_planets: list[PlanetaryPosition],
+    timing_window: str,
+) -> str:
+    concern = _describe_concern(question, topic_name)
+    lead_planet = linked_planets[0].planet if linked_planets else moon.planet
+    trend_phrase = _describe_trend_phrase(topic_name, trend, topic_context)
+    timing_phrase = (
+        f"The strongest timing focus in this answer is {timing_window}, under the active dasha chain "
+        f"{chart.dasha_summary.maha_dasha} / {chart.dasha_summary.bhukti} / {chart.dasha_summary.antara}."
+    )
+    chart_phrase = (
+        f"This reading is being anchored through {chart.house_cusps[0].sign} lagna, {moon.sign} janma rasi, "
+        f"and {moon.nakshatra} nakshatra, with house {dominant_cusp.house} currently leading the topic through "
+        f"{dominant_cusp.sign_lord}, {dominant_cusp.star_lord}, and {dominant_cusp.sub_lord}."
+    )
+    emphasis_phrase = (
+        f"Right now, {lead_planet} is carrying an important part of the active significator load for this question."
+    )
+
+    return " ".join([concern, trend_phrase, timing_phrase, chart_phrase, emphasis_phrase])
+
+
+def _describe_concern(question: str, topic_name: str) -> str:
+    normalized = question.lower()
+    if any(keyword in normalized for keyword in ["eye", "eyes", "vision", "sight", "eyesight"]):
+        return "For the specific concern of eye health, the chart does not currently read like a severe danger signal."
+    if any(keyword in normalized for keyword in ["marriage", "partner", "relationship"]):
+        return "For this relationship question, the app is reading the chart as a question of commitment timing and emotional stability."
+    if any(keyword in normalized for keyword in ["job", "career", "promotion", "work"]):
+        return "For this career question, the app is reading the chart mainly through progress, stability, and timing of opportunity."
+    if topic_name == "Health Caution":
+        return "For this health-related question, the chart should be read more as an early caution and management signal than as certainty."
+    return f"For this {topic_name.lower()} question, the app is trying to summarize the chart in a more practical plain-language way."
+
+
+def _describe_trend_phrase(topic_name: str, trend: str, topic_context: dict[str, object]) -> str:
+    promise = str(topic_context["promise"])
+    challenge = str(topic_context["challenge"])
+
+    if trend == "supportive":
+        return (
+            f"The current reading leans supportive, which means the stronger side of the chart points more toward "
+            f"{promise} than toward {challenge}."
+        )
+    if trend == "challenging":
+        return (
+            f"The current reading is more cautionary, which means the chart is showing more risk of "
+            f"{challenge} than of {promise} right now."
+        )
+    return (
+        f"The current reading is mixed, so the chart shows both the possibility of {promise} and the need to watch "
+        f"for {challenge} before making a strong conclusion."
+    )
 
 
 def _rank_significators(

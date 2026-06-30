@@ -301,7 +301,11 @@ export function QuestionWorkspace({ chartId }: { chartId: string }) {
 
               <div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
                 <div className="rounded-[28px] bg-slate-50 p-5">
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aurora/80">Reading summary</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-aurora/80">Plain-language reading</p>
+                  <div className="mt-4 rounded-2xl bg-white px-4 py-4 text-sm leading-7 text-midnight/75">
+                    {answer.plainExplanation}
+                  </div>
+                  <p className="mt-5 text-sm font-semibold uppercase tracking-[0.18em] text-aurora/80">Reading summary</p>
                   <div className="mt-4 space-y-3">
                     {answer.interpretation.slice(0, 3).map((item) => (
                       <div key={item} className="rounded-2xl bg-white px-4 py-3 text-sm leading-7 text-midnight/70">
@@ -467,15 +471,16 @@ function buildInsightLines(dashaSummary: ChartSessionResponse["chartData"]["dash
 function buildPriorityHighlights(answer: ChartQuestionResponse) {
   return [
     `Primary timing window: ${answer.possibleTimingWindow}.`,
+    answer.plainExplanation,
     answer.supportingFactors[0] ?? "Supporting factors are still being assembled for this answer.",
     answer.blockingFactors[0] ?? "Blocking factors are currently limited in the generated reading.",
   ];
 }
 
 function pickAnswerLead(answer: ChartQuestionResponse) {
-  return answer.interpretation[3] ?? answer.interpretation[1] ?? answer.interpretation[0] ?? "Answer summary unavailable.";
+  return answer.plainExplanation || answer.interpretation[3] || answer.interpretation[1] || answer.interpretation[0] || "Answer summary unavailable.";
 }
 
 function pickHistoryPreview(item: ChartQuestionResponse) {
-  return item.interpretation[3] ?? item.interpretation[1] ?? item.interpretation[0] ?? "Answer summary unavailable.";
+  return item.plainExplanation || item.interpretation[3] || item.interpretation[1] || item.interpretation[0] || "Answer summary unavailable.";
 }

@@ -149,6 +149,7 @@ export type ChartQuestionRequest = {
 export type ChartQuestionResponse = {
   question: string;
   classifiedTopic: string;
+  plainExplanation: string;
   relevantHouses: number[];
   cuspSubLordAnalysis: string[];
   significatorAnalysis: string[];

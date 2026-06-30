@@ -141,6 +141,7 @@ class ChartQuestionResponse(BaseModel):
 
     question: str
     classified_topic: str = Field(..., alias="classifiedTopic")
+    plain_explanation: str = Field(..., alias="plainExplanation")
     relevant_houses: list[int] = Field(..., alias="relevantHouses")
     cusp_sub_lord_analysis: list[str] = Field(..., alias="cuspSubLordAnalysis")
     significator_analysis: list[str] = Field(..., alias="significatorAnalysis")
